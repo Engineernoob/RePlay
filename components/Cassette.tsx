@@ -9,7 +9,7 @@ export default function Cassette() {
   return (
     <View style={styles.container}>
       <LottieView
-        source={require("../../assets/cassette.json")}
+        source={require("../assets/Tape.json")}
         autoPlay={isPlaying}
         loop={isPlaying}
         style={{ width: 280, height: 160 }}
