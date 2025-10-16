@@ -1,36 +1,58 @@
 import { create } from "zustand";
-import { Audio } from "expo-av";
+import {
+  useAudioPlayer,
+  useAudioPlayerStatus,
+  setAudioModeAsync,
+} from "expo-audio";
+import { useEffect } from "react";
 
 type PlayerState = {
+  isInitialized: boolean;
   isPlaying: boolean;
-  sound: Audio.Sound | null;
-  play: (uri: string) => Promise<void>;
-  pause: () => Promise<void>;
-  stop: () => Promise<void>;
+  duration: number;
+  currentTime: number;
+  play: () => void;
+  pause: () => void;
+  seekTo: (seconds: number) => void;
 };
 
-export const usePlayerStore = create<PlayerState>((set, get) => ({
+export const usePlayerStore = create<PlayerState>(() => ({
+  isInitialized: false,
   isPlaying: false,
-  sound: null,
-  play: async (uri) => {
-    const { sound } = await Audio.Sound.createAsync(
-      { uri },
-      { shouldPlay: true }
-    );
-    set({ sound, isPlaying: true });
-  },
-  pause: async () => {
-    const { sound } = get();
-    if (sound) {
-      await sound.pauseAsync();
-      set({ isPlaying: false });
-    }
-  },
-  stop: async () => {
-    const { sound } = get();
-    if (sound) {
-      await sound.stopAsync();
-      set({ isPlaying: false });
-    }
-  },
+  duration: 0,
+  currentTime: 0,
+  play: () => {},
+  pause: () => {},
+  seekTo: () => {},
 }));
+
+// Hook to attach Expo Audio player and sync Zustand
+export function usePlayerController(source: any) {
+  // create player and status hooks from expo-audio
+  const player = useAudioPlayer(source, { updateInterval: 200 });
+  const status = useAudioPlayerStatus(player);
+
+  // Configure audio mode
+  useEffect(() => {
+    (async () => {
+      await setAudioModeAsync({
+        playsInSilentMode: true,
+        shouldPlayInBackground: true,
+        interruptionMode: "mixWithOthers",
+      });
+    })();
+  }, []);
+
+  // Sync Zustand with player state
+  useEffect(() => {
+    usePlayerStore.setState({
+      isInitialized: true,
+      isPlaying: status.playing,
+      duration: status.duration,
+      currentTime: status.currentTime,
+      play: () => player.play(),
+      pause: () => player.pause(),
+      seekTo: (t) => player.seekTo(t),
+    });
+  }, [status, player]);
+}

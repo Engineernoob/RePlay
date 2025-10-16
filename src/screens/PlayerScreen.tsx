@@ -1,32 +1,26 @@
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
-import Cassette from "@/components/Cassette";
-import { usePlayerStore } from "../store/playerStore";
+import Cassette from "../../components/Cassette";
+import { usePlayerController, usePlayerStore } from "../store/playerStore";
+
+const source = require("../../assets/sample.mp3");
 
 export default function PlayerScreen() {
-  const { play, pause, isPlaying } = usePlayerStore();
+  usePlayerController(source);
+  const { play, pause, isPlaying, currentTime, duration } = usePlayerStore();
 
-  const onPlay = async () => {
-    await play(require("../../assets/sample.mp3"));
-  };
-
-  const onPause = async () => {
-    await pause();
-  };
+  const togglePlay = () => (isPlaying ? pause() : play());
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>CassetteBeat 🎵</Text>
-      <Cassette />
-
-      <View style={styles.controls}>
-        <TouchableOpacity
-          style={[styles.button, { backgroundColor: "#FF6B6B" }]}
-          onPress={isPlaying ? onPause : onPlay}
-        >
-          <Text style={styles.buttonText}>{isPlaying ? "Pause" : "Play"}</Text>
-        </TouchableOpacity>
-      </View>
+      <Cassette /> {/* ✅ no props needed, uses Zustand internally */}
+      <TouchableOpacity style={styles.button} onPress={togglePlay}>
+        <Text style={styles.buttonText}>{isPlaying ? "Pause" : "Play"}</Text>
+      </TouchableOpacity>
+      <Text style={styles.time}>
+        {Math.floor(currentTime)} / {Math.floor(duration)} sec
+      </Text>
     </View>
   );
 }
@@ -34,22 +28,17 @@ export default function PlayerScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0a0a0a",
+    backgroundColor: "#000",
     alignItems: "center",
     justifyContent: "center",
   },
-  title: {
-    color: "#FFDD57",
-    fontSize: 24,
-    marginBottom: 20,
-    fontWeight: "700",
-  },
-  controls: { flexDirection: "row", marginTop: 30 },
+  title: { color: "#fff", fontSize: 24, marginBottom: 20 },
   button: {
-    paddingVertical: 10,
-    paddingHorizontal: 25,
+    backgroundColor: "#FF6B6B",
+    padding: 15,
     borderRadius: 10,
-    marginHorizontal: 10,
+    marginTop: 30,
   },
-  buttonText: { color: "#fff", fontWeight: "700" },
+  buttonText: { color: "#fff", fontWeight: "bold" },
+  time: { color: "#aaa", marginTop: 20 },
 });
