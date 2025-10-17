@@ -12,7 +12,7 @@ const songs: Record<string, { audio: any; album: any; color: string; artist: str
     title: "On My Mama",
     artist: "Victoria Monét",
     audio: require("@/assets/mp3s/OnMyMama.mp3"),
-    album: require("@/assets/images/covers/Victoria Monèt.png"),
+    album: require("@/assets/images/covers/VictoriaMonèt.png"),
     color: "#FF7E57",
   },
   "2": {
