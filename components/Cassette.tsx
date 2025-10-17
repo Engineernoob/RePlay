@@ -1,6 +1,11 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { View, Image, StyleSheet } from "react-native";
-import Animated, { useAnimatedStyle, withTiming } from "react-native-reanimated";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withTiming,
+} from "react-native-reanimated";
 
 interface CassetteProps {
   color: string;
@@ -8,26 +13,36 @@ interface CassetteProps {
 }
 
 export default function Cassette({ color, album }: CassetteProps) {
-  // reel spin animation
-  const rotation = withTiming("360deg", { duration: 3000 });
+  // Shared value for reel rotation
+  const rotation = useSharedValue(0);
 
+  // Start continuous rotation
+  useEffect(() => {
+    rotation.value = withRepeat(
+      withTiming(360, { duration: 3000 }), // spin full circle in 3s
+      -1, // infinite loop
+      false // no reverse
+    );
+  }, [rotation]);
+
+  // Animated style for spinning reels
   const reelStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: rotation }],
+    transform: [{ rotate: `${rotation.value}deg` }], // ✅ must be a string
   }));
 
   return (
-    <View style={[styles.container]}>
+    <View style={styles.container}>
       {/* Cassette base */}
       <Image
         source={require("@/assets/images/cassette-base-1.png")}
         style={[styles.cassetteImage, { tintColor: color }]}
       />
 
-      {/* Album cover on label */}
+      {/* Album cover */}
       <Image source={album} style={styles.albumCover} />
 
-      {/* Optional spinning reels */}
-      <Animated.View style={[styles.reel, reelStyle]} />
+      {/* Spinning reels */}
+      <Animated.View style={[styles.reel, reelStyle, { left: 50 }]} />
       <Animated.View style={[styles.reel, reelStyle, { right: 50 }]} />
     </View>
   );
@@ -56,8 +71,6 @@ const styles = StyleSheet.create({
     height: 25,
     borderRadius: 12.5,
     backgroundColor: "#222",
-    left: 50,
     top: 65,
   },
 });
-
