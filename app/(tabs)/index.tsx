@@ -15,7 +15,7 @@ const songs = [
     title: "On my Mama",
     artist: "Victoria Monét",
     file: require("@/assets/mp3s/OnMyMama.mp3"),
-    cover: require("@/assets/images/covers/Victoria Monèt.png"),
+    cover: require("@/assets/images/covers/VictoriaMonèt.png"),
   },
   {
     id: "2",
