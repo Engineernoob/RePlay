@@ -16,9 +16,10 @@ interface CassetteProps {
   album: any;
   title?: string;
   artist?: string;
+  sharedTransitionTag?: string;
 }
 
-export default function Cassette({ color, album, title, artist }: CassetteProps) {
+export default function Cassette({ color, album, title, artist, sharedTransitionTag }: CassetteProps) {
   const isPlaying = usePlayerStore((s) => s.isPlaying);
   const rotation = useSharedValue(0);
   const flip = useSharedValue(0);
@@ -66,7 +67,10 @@ export default function Cassette({ color, album, title, artist }: CassetteProps)
 
   return (
     <TouchableWithoutFeedback onLongPress={handleFlip}>
-      <Animated.View style={[styles.shell, { backgroundColor: color }, flipStyle]}>
+      <Animated.View
+        sharedTransitionTag={sharedTransitionTag}
+        style={[styles.shell, { backgroundColor: color }, flipStyle]}
+      >
         {/* FRONT SIDE */}
         <View style={[StyleSheet.absoluteFill, styles.front]}>
           <View style={styles.gloss} />

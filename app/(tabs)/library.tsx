@@ -2,119 +2,123 @@ import React from "react";
 import {
   View,
   Text,
-  StyleSheet,
+  FlatList,
   TouchableOpacity,
+  Image,
+  StyleSheet,
   Dimensions,
 } from "react-native";
-import { Link } from "expo-router";
 import Animated, {
-  useAnimatedScrollHandler,
-  useAnimatedStyle,
   useSharedValue,
-  interpolate,
-  Extrapolate,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
 } from "react-native-reanimated";
-import Cassette from "@/components/Cassette";
+import { useRouter } from "expo-router";
+import { useTheme } from "@react-navigation/native";
+import type { WalkmanThemeType } from "@/constants/walkman-theme";
 
-const { width } = Dimensions.get("window");
-
-// 🎵 Song data
 const songs = [
   {
     id: "1",
     title: "On My Mama",
     artist: "Victoria Monét",
-    color: "#FF7E57",
     album: require("@/assets/images/covers/VictoriaMonet.png"),
+    color: "#FF7E57",
   },
   {
     id: "2",
     title: "Timeless",
     artist: "The Weeknd & Playboi Carti",
-    color: "#7E57FF",
     album: require("@/assets/images/covers/Timeless.png"),
+    color: "#7E57FF",
   },
   {
     id: "3",
     title: "Paint the Town Red",
     artist: "Doja Cat",
-    color: "#D62D2D",
     album: require("@/assets/images/covers/Paint-The-Town-Red.png"),
+    color: "#D62D2D",
   },
 ];
 
-export default function LibraryScreen() {
-  const scrollX = useSharedValue(0);
+const { width } = Dimensions.get("window");
 
-  // Handle scroll position updates
-  const onScroll = useAnimatedScrollHandler({
-    onScroll: (event) => {
-      scrollX.value = event.contentOffset.x;
-    },
-  });
+function CassetteCard({
+  item,
+  onPress,
+}: {
+  item: (typeof songs)[0];
+  onPress: () => void;
+}) {
+  const rotation = useSharedValue(0);
+  const elevation = useSharedValue(0);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { perspective: 800 },
+      { rotateY: `${rotation.value}deg` },
+      { translateY: -elevation.value },
+    ],
+  }));
+
+  const handlePressIn = () => {
+    rotation.value = withSpring(-15, { damping: 8 });
+    elevation.value = withSpring(8);
+  };
+
+  const handlePressOut = () => {
+    rotation.value = withTiming(0, { duration: 200 });
+    elevation.value = withTiming(0, { duration: 200 });
+  };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.header}>🎶 My Cassette Collection</Text>
+    <TouchableOpacity
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      onPress={onPress}
+      activeOpacity={0.9}
+    >
+      <Animated.View
+        sharedTransitionTag={`cassette-${item.id}`} // ✅ shared tag
+        style={[
+          styles.card,
+          animatedStyle,
+          { backgroundColor: item.color, shadowColor: item.color },
+        ]}
+      >
+        <Image source={item.album} style={styles.cover} />
+        <View style={styles.textBox}>
+          <Text style={styles.title}>{item.title}</Text>
+          <Text style={styles.artist}>{item.artist}</Text>
+        </View>
+      </Animated.View>
+    </TouchableOpacity>
+  );
+}
 
-      <Animated.FlatList
+export default function LibraryScreen() {
+  const router = useRouter();
+  const theme = useTheme() as WalkmanThemeType;
+
+  const openPlayer = (id: string) => {
+    router.push(`/player?id=${id}`);
+  };
+
+  return (
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <Text style={[styles.header, { color: theme.colors.primary }]}>
+        My Cassette Shelf 🎶
+      </Text>
+
+      <FlatList
         data={songs}
         keyExtractor={(item) => item.id}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        snapToInterval={width * 0.7}
-        decelerationRate="fast"
-        onScroll={onScroll}
-        scrollEventThrottle={16}
-        contentContainerStyle={{ paddingHorizontal: (width - width * 0.7) / 2 }}
-        renderItem={({ item, index }) => {
-          // ✅ Move hook here: renderItem is directly inside component scope
-          // eslint-disable-next-line react-hooks/rules-of-hooks
-          const animatedStyle = useAnimatedStyle(() => {
-            const inputRange = [
-              (index - 1) * (width * 0.7),
-              index * (width * 0.7),
-              (index + 1) * (width * 0.7),
-            ];
-
-            const scale = interpolate(
-              scrollX.value,
-              inputRange,
-              [0.8, 1, 0.8],
-              Extrapolate.CLAMP
-            );
-
-            const rotateY = interpolate(
-              scrollX.value,
-              inputRange,
-              [-10, 0, 10],
-              Extrapolate.CLAMP
-            );
-
-            return {
-              transform: [
-                { scale },
-                { rotateY: `${rotateY}deg` }, // ✅ must be string
-              ],
-            };
-          });
-
-          return (
-            <Animated.View style={[styles.cassetteWrapper, animatedStyle]}>
-              <Link href={`/player?id=${item.id}`} asChild>
-                <TouchableOpacity activeOpacity={0.8}>
-                  <Cassette color={item.color} album={item.album} />
-                  <View style={styles.label}>
-                    <Text style={[styles.songTitle, { color: item.color }]}>
-                      {item.title}
-                    </Text>
-                    <Text style={styles.songArtist}>{item.artist}</Text>
-                  </View>
-                </TouchableOpacity>
-              </Link>
-            </Animated.View>
-          );
-        }}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 100 }}
+        renderItem={({ item }) => (
+          <CassetteCard item={item} onPress={() => openPlayer(item.id)} />
+        )}
       />
     </View>
   );
@@ -123,31 +127,45 @@ export default function LibraryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000",
-    paddingTop: 80,
     alignItems: "center",
+    paddingTop: 50,
   },
   header: {
-    color: "#fff",
     fontSize: 22,
-    fontWeight: "bold",
+    fontWeight: "700",
     marginBottom: 20,
   },
-  cassetteWrapper: {
-    width: width * 0.7,
+  card: {
+    width: width * 0.9,
+    height: 130,
+    borderRadius: 14,
+    marginBottom: 20,
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "flex-start",
+    padding: 12,
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
   },
-  label: {
-    marginTop: 12,
-    alignItems: "center",
+  cover: {
+    width: 90,
+    height: 90,
+    borderRadius: 6,
+    marginRight: 15,
   },
-  songTitle: {
+  textBox: {
+    flexShrink: 1,
+  },
+  title: {
     fontSize: 18,
     fontWeight: "700",
+    color: "#FFF",
   },
-  songArtist: {
-    color: "#ccc",
+  artist: {
     fontSize: 14,
+    marginTop: 4,
+    color: "#DDD",
   },
 });
+

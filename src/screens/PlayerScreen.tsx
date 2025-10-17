@@ -1,117 +1,120 @@
-import React, { useEffect, useRef } from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import React from "react";
+import { View, StyleSheet } from "react-native";
 import { useLocalSearchParams } from "expo-router";
-import { usePlayerController, usePlayerStore, playSfx } from "../../src/store/playerStore";
-import Walkman from "../../components/Walkman";
+import { usePlayerController, usePlayerStore } from "@/src/store/playerStore";
+import Cassette from "@/components/Cassette";
+import LCDDisplay from "@/components/LCDDisplay";
+import VUMeter from "@/components/VUMeter";
+import { WalkmanThemeType } from "@/constants/walkman-theme";
+import { useTheme } from "@react-navigation/native";
+import Animated, {
+  useAnimatedStyle,
+  withTiming,
+} from "react-native-reanimated";
 
-// 🎵 Song data
 const songs: Record<
   string,
-  { title: string; artist: string; color: string; album: any; audio: any }
+  { audio: any; album: any; color: string; artist: string; title: string }
 > = {
   "1": {
     title: "On My Mama",
     artist: "Victoria Monét",
+    audio: require("@/assets/mp3s/OnMyMama.mp3"),
+    album: require("@/assets/images/covers/VictoriaMonet.png"),
     color: "#FF7E57",
-    album: require("../../assets/images/covers/VictoriaMonet.png"),
-    audio: require("../../assets/mp3s/OnMyMama.mp3"),
   },
   "2": {
     title: "Timeless",
     artist: "The Weeknd & Playboi Carti",
+    audio: require("@/assets/mp3s/Timeless.mp3"),
+    album: require("@/assets/images/covers/Timeless.png"),
     color: "#7E57FF",
-    album: require("../../assets/images/covers/Timeless.png"),
-    audio: require("../../assets/mp3s/Timeless.mp3"),
   },
   "3": {
     title: "Paint the Town Red",
     artist: "Doja Cat",
+    audio: require("@/assets/mp3s/PaintTheTownRed.mp3"),
+    album: require("@/assets/images/covers/Paint-The-Town-Red.png"),
     color: "#D62D2D",
-    album: require("../../assets/images/covers/Paint-The-Town-Red.png"),
-    audio: require("../../assets/mp3s/PaintTheTownRed.mp3"),
   },
 };
 
 export default function PlayerScreen() {
   const { id = "1" } = useLocalSearchParams<{ id?: string }>();
   const song = songs[id];
-  const { play, pause, isPlaying, currentTime, duration } = usePlayerStore();
-  const hasInserted = useRef(false);
+  const { play, pause, isPlaying } = usePlayerStore();
+  const theme = useTheme() as WalkmanThemeType;
 
-  // Attach player to selected tape
+  // initialize player
   usePlayerController(song.audio);
 
-  const togglePlay = () => (isPlaying ? pause() : play());
-
-  // Handle cassette sound effects
-  useEffect(() => {
-    if (isPlaying && !hasInserted.current) {
-      hasInserted.current = true;
-      playSfx(require("../../assets/sfx/tape-cassette-insert.mp3"));
-      playSfx(require("../../assets/sfx/closing-tape-cassette.mp3"), 500);
-    }
-    if (!isPlaying && hasInserted.current) {
-      playSfx(require("../../assets/sfx/cassette-eject.mp3"));
-      hasInserted.current = false;
-    }
-  }, [isPlaying]);
+  // slide cassette in/out animation
+  const cassetteAnim = useAnimatedStyle(() => ({
+    transform: [
+      { translateY: withTiming(isPlaying ? 0 : 150, { duration: 700 }) },
+    ],
+  }));
 
   return (
-    <View style={styles.container}>
-      <Text style={[styles.title, { color: song.color }]}>{song.title}</Text>
-      <Text style={styles.artist}>{song.artist}</Text>
+    <View
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
+    >
+      {/* LCD + VU Meter */}
+      <View style={styles.displaySection}>
+        <LCDDisplay />
+        <VUMeter barCount={12} height={35} />
+      </View>
 
-      {/* 🎛 The Walkman deck */}
-      <Walkman cassetteInserted={isPlaying} color={song.color} album={song.album} />
+      {/* Cassette animation */}
+      <Animated.View style={[cassetteAnim]}>
+        <Cassette color={song.color} album={song.album} />
+      </Animated.View>
 
-      {/* Play / Pause button */}
-      <TouchableOpacity
-        style={[styles.button, { backgroundColor: song.color }]}
-        onPress={togglePlay}
-      >
-        <Text style={styles.buttonText}>{isPlaying ? "⏸ Pause" : "▶️ Play"}</Text>
-      </TouchableOpacity>
+      {/* Controls */}
+      <View style={styles.controls}>
+        <View style={styles.buttonRow}>
+          <Button label="⏪" onPress={() => {}} />
+          <Button
+            label={isPlaying ? "⏸" : "▶️"}
+            onPress={() => (isPlaying ? pause() : play())}
+          />
+          <Button label="⏩" onPress={() => {}} />
+        </View>
+      </View>
+    </View>
+  );
+}
 
-      {/* Playback time */}
-      <Text style={styles.time}>
-        {Math.floor(currentTime)} / {Math.floor(duration)} sec
-      </Text>
+function Button({ label, onPress }: { label: string; onPress: () => void }) {
+  return (
+    <View style={styles.btnOuter}>
+      <View style={styles.btnInner}>
+        <View>
+          <View onTouchEnd={onPress}>
+            <Animated.Text style={styles.btnLabel}>{label}</Animated.Text>
+          </View>
+        </View>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#000",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 8,
-  },
-  artist: {
-    color: "#ccc",
-    fontSize: 16,
-    marginBottom: 20,
-  },
-  button: {
-    paddingVertical: 12,
-    paddingHorizontal: 40,
+  container: { flex: 1, alignItems: "center", justifyContent: "space-around" },
+  displaySection: { alignItems: "center", marginTop: 40 },
+  controls: { marginBottom: 40 },
+  buttonRow: { flexDirection: "row", gap: 25 },
+  btnOuter: {
+    backgroundColor: "#333",
     borderRadius: 12,
-    marginTop: 40,
+    padding: 8,
+    borderWidth: 2,
+    borderColor: "#666",
   },
-  buttonText: {
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: 18,
+  btnInner: {
+    backgroundColor: "#222",
+    borderRadius: 10,
+    padding: 10,
   },
-  time: {
-    color: "#aaa",
-    marginTop: 20,
-  },
+  btnLabel: { fontSize: 20, color: "#FFDD57" },
 });
-
-

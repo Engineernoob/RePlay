@@ -11,24 +11,25 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
-
-  // Switch theme based on system mode or force Walkman style
   const theme = colorScheme === "dark" ? WalkmanTheme : WalkmanTheme;
 
   return (
     <ThemeProvider value={theme}>
       <Stack>
-        {/* Main tabbed layout */}
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-
-        {/* Modal route (optional) */}
+        <Stack.Screen
+          name="player"
+          options={{
+            headerShown: false,
+            presentation: "transparentModal",
+            animation: "fade",
+          }}
+        />
         <Stack.Screen
           name="modal"
           options={{ presentation: "modal", title: "Modal" }}
         />
       </Stack>
-
-      {/* Walkman amber LED status bar */}
       <StatusBar style="light" backgroundColor="#0C2233" />
     </ThemeProvider>
   );
