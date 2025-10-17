@@ -5,7 +5,10 @@ import Animated, {
   useAnimatedStyle,
   withRepeat,
   withTiming,
+  cancelAnimation,
+  Easing,
 } from "react-native-reanimated";
+import { usePlayerStore } from "@/src/store/playerStore";
 
 interface CassetteProps {
   color: string;
@@ -13,21 +16,35 @@ interface CassetteProps {
 }
 
 export default function Cassette({ color, album }: CassetteProps) {
-  // Shared value for reel rotation
+  const isPlaying = usePlayerStore((s) => s.isPlaying);
   const rotation = useSharedValue(0);
+  const spinSpeed = 3000; // full rotation every 3 seconds
 
-  // Start continuous rotation
   useEffect(() => {
-    rotation.value = withRepeat(
-      withTiming(360, { duration: 3000 }), // spin full circle in 3s
-      -1, // infinite loop
-      false // no reverse
-    );
-  }, [rotation]);
+    if (isPlaying) {
+      // Start continuous rotation
+      rotation.value = withRepeat(
+        withTiming(360, {
+          duration: spinSpeed,
+          easing: Easing.linear,
+        }),
+        -1,
+        false
+      );
+    } else {
+      // Stop with smooth ease-out
+      cancelAnimation(rotation);
+      const normalized = rotation.value % 360; // keep current position
+      rotation.value = withTiming(normalized, {
+        duration: 600,
+        easing: Easing.out(Easing.quad),
+      });
+    }
+  }, [isPlaying, rotation]);
 
-  // Animated style for spinning reels
+  // Animated rotation style
   const reelStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${rotation.value}deg` }], // ✅ must be a string
+    transform: [{ rotate: `${rotation.value}deg` }],
   }));
 
   return (
