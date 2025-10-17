@@ -15,21 +15,21 @@ const songs = [
     title: "On my Mama",
     artist: "Victoria Monét",
     file: require("@/assets/mp3s/OnMyMama.mp3"),
-    cover: require("@/assets/covers/Victoria Monèt.png"),
+    cover: require("@/assets/images/covers/Victoria Monèt.png"),
   },
   {
     id: "2",
     title: "Timeless",
     artist: "The Weeknd feat Playboy Carti",
     file: require("@/assets/mp3s/Timeless.mp3"),
-    cover: require("@/assets/covers/Timeless.png"),
+    cover: require("@/assets/images/covers/Timeless.png"),
   },
   {
     id: "3",
     title: "Paint the Town Red",
     artist: "Doja Cat",
     file: require("@/assets/mp3s/PainttheTownRed.mp3"),
-    cover: require("@/assets/covers/Paint-The-Town-Red.png"),
+    cover: require("@/assets/images/covers/Paint-The-Town-Red.png"),
   },
 ];
 
