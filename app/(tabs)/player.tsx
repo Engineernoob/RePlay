@@ -1,64 +1,97 @@
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Image } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import Animated, { useAnimatedStyle, withTiming } from "react-native-reanimated";
+import { BlurView } from "expo-blur";
 import { usePlayerController, usePlayerStore } from "@/src/store/playerStore";
 import Cassette from "@/components/Cassette";
 
-const tapes: Record<string, any> = {
-  "1": require("@/assets/mp3s/midnight.mp3"),
-  "2": require("@/assets/mp3s/blinding.mp3"),
-  "3": require("@/assets/mp3s/dreams.mp3"),
+// ✅ songs data mapping for quick lookup
+const songs: Record<string, { audio: any; album: any; color: string; artist: string; title: string }> = {
+  "1": {
+    title: "On My Mama",
+    artist: "Victoria Monét",
+    audio: require("@/assets/mp3s/OnMyMama.mp3"),
+    album: require("@/assets/covers/Victoria Monèt.png"),
+    color: "#FF7E57",
+  },
+  "2": {
+    title: "Timeless",
+    artist: "The Weeknd & Playboi Carti",
+    audio: require("@/assets/mp3s/Timeless.mp3"),
+    album: require("@/assets/images/Timeless.png"),
+    color: "#7E57FF",
+  },
+  "3": {
+    title: "Paint the Town Red",
+    artist: "Doja Cat",
+    audio: require("@/assets/mp3s/Paint-The-Town-Red.mp3"),
+    album: require("@/assets/covers/Paint-The-Town-Red.png"),
+    color: "#D62D2D",
+  },
 };
 
 export default function PlayerScreen() {
-  const { id = "1", title = "Unknown" } = useLocalSearchParams<{
-    id?: string;
-    title?: string;
-  }>();
+  const { id = "1" } = useLocalSearchParams<{ id?: string }>();
+  const song = songs[id];
+  const { play, pause, isPlaying, currentTime, duration } = usePlayerStore();
 
-  const source = tapes[id];
-  usePlayerController(source);
+  // init audio player for selected song
+  usePlayerController(song.audio);
 
-  const { isPlaying, play, pause } = usePlayerStore();
-
-  // Slide cassette animation
+  // animation for cassette sliding into deck
   const cassetteStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: withTiming(isPlaying ? 0 : 200, { duration: 600 }) }],
+    transform: [{ translateY: withTiming(isPlaying ? 0 : 200, { duration: 700 }) }],
   }));
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>{title}</Text>
+    <View style={[styles.container, { backgroundColor: "#000" }]}>
+      {/* background glow based on song color */}
+      <BlurView style={[styles.glow, { backgroundColor: song.color }]} intensity={40} tint="dark" />
+
+      {/* album title */}
+      <Text style={styles.title}>{song.title}</Text>
+      <Text style={styles.artist}>{song.artist}</Text>
+
+      {/* Cassette animation */}
       <Animated.View style={[cassetteStyle]}>
-        <Cassette />
+        <Cassette color={song.color} album={song.album} />
       </Animated.View>
 
-      <TouchableOpacity style={styles.button} onPress={() => (isPlaying ? pause() : play())}>
+      {/* Controls */}
+      <TouchableOpacity style={[styles.button, { backgroundColor: song.color }]} onPress={() => (isPlaying ? pause() : play())}>
         <Text style={styles.buttonText}>{isPlaying ? "⏸ Pause" : "▶️ Play"}</Text>
       </TouchableOpacity>
 
-      <Image
-        source={require("@/assets/images/walkman-bg.png")}
-        style={styles.walkmanBg}
-        blurRadius={8}
-      />
+      <Text style={styles.time}>
+        {Math.floor(currentTime)} / {Math.floor(duration)} sec
+      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#000", alignItems: "center", justifyContent: "center" },
-  title: { color: "#FFDD57", fontSize: 24, marginBottom: 20, fontWeight: "700" },
+  container: { flex: 1, alignItems: "center", justifyContent: "center", position: "relative" },
+  glow: {
+    position: "absolute",
+    width: 400,
+    height: 400,
+    borderRadius: 200,
+    opacity: 0.2,
+    top: "30%",
+    zIndex: -1,
+  },
+  title: { color: "#FFF", fontSize: 24, fontWeight: "700", marginTop: 10 },
+  artist: { color: "#AAA", fontSize: 16, marginBottom: 20 },
   button: {
-    backgroundColor: "#FF6B6B",
+    marginTop: 40,
     paddingVertical: 10,
     paddingHorizontal: 30,
     borderRadius: 12,
-    marginTop: 40,
   },
-  buttonText: { color: "#fff", fontWeight: "bold", fontSize: 18 },
-  walkmanBg: { position: "absolute", width: "100%", height: "100%", opacity: 0.25 },
+  buttonText: { color: "#FFF", fontSize: 18, fontWeight: "700" },
+  time: { color: "#999", marginTop: 15 },
 });
+
 
 

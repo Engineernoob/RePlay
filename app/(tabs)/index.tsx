@@ -12,24 +12,24 @@ import { Link } from "expo-router";
 const songs = [
   {
     id: "1",
-    title: "Midnight City",
-    artist: "M83",
-    file: require("@/assets/mp3s/midnight.mp3"),
-    cover: require("@/assets/images/tape1.png"),
+    title: "On my Mama",
+    artist: "Victoria Monét",
+    file: require("@/assets/mp3s/OnMyMama.mp3"),
+    cover: require("@/assets/covers/Victoria Monèt.png"),
   },
   {
     id: "2",
-    title: "Blinding Lights",
-    artist: "The Weeknd",
-    file: require("@/assets/mp3s/blinding.mp3"),
-    cover: require("@/assets/images/tape2.png"),
+    title: "Timeless",
+    artist: "The Weeknd feat Playboy Carti",
+    file: require("@/assets/mp3s/Timeless.mp3"),
+    cover: require("@/assets/covers/Timeless.png"),
   },
   {
     id: "3",
-    title: "Dreams",
-    artist: "Fleetwood Mac",
-    file: require("@/assets/mp3s/dreams.mp3"),
-    cover: require("@/assets/images/tape3.png"),
+    title: "Paint the Town Red",
+    artist: "Doja Cat",
+    file: require("@/assets/mp3s/PainttheTownRed.mp3"),
+    cover: require("@/assets/covers/Paint-The-Town-Red.png"),
   },
 ];
 
