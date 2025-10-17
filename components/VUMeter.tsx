@@ -25,16 +25,23 @@ function MeterBar({
 
   useEffect(() => {
     if (isPlaying) {
+      // More realistic music-reactive animation
       level.value = withRepeat(
         withSequence(
-          withTiming(Math.random(), { duration: 200 + delay }),
-          withTiming(0.3 + Math.random() * 0.4, { duration: 300 + delay })
+          // Quick spike up
+          withTiming(0.3 + Math.random() * 0.7, { duration: 100 + delay }),
+          // Decay to medium level
+          withTiming(0.2 + Math.random() * 0.3, { duration: 200 + delay }),
+          // Small secondary spike
+          withTiming(0.4 + Math.random() * 0.4, { duration: 150 + delay }),
+          // Final decay
+          withTiming(0.1 + Math.random() * 0.2, { duration: 250 + delay })
         ),
         -1,
-        true
+        false // Don't reverse for more natural movement
       );
     } else {
-      level.value = withTiming(0.1, { duration: 300 });
+      level.value = withTiming(0.05, { duration: 500 });
     }
   }, [delay, isPlaying, level]);
 

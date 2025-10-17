@@ -1,12 +1,11 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
   FlatList,
   TouchableOpacity,
-  Image,
   StyleSheet,
-  Dimensions,
+  Alert,
 } from "react-native";
 import Animated, {
   useSharedValue,
@@ -17,6 +16,9 @@ import Animated, {
 import { useRouter } from "expo-router";
 import { useTheme } from "@react-navigation/native";
 import type { WalkmanThemeType } from "@/constants/walkman-theme";
+import Cassette from "@/components/Cassette";
+import PlaylistManager from "@/components/PlaylistManager";
+import { usePlayerStore } from "@/src/store/playerStore";
 
 const songs = [
   {
@@ -42,14 +44,16 @@ const songs = [
   },
 ];
 
-const { width } = Dimensions.get("window");
+
 
 function CassetteCard({
   item,
   onPress,
+  onAddToPlaylist,
 }: {
   item: (typeof songs)[0];
   onPress: () => void;
+  onAddToPlaylist: () => void;
 }) {
   const rotation = useSharedValue(0);
   const elevation = useSharedValue(0);
@@ -77,21 +81,23 @@ function CassetteCard({
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       onPress={onPress}
+      onLongPress={onAddToPlaylist}
+      delayLongPress={500}
       activeOpacity={0.9}
     >
       <Animated.View
-        sharedTransitionTag={`cassette-${item.id}`} // ✅ shared tag
         style={[
           styles.card,
           animatedStyle,
-          { backgroundColor: item.color, shadowColor: item.color },
         ]}
       >
-        <Image source={item.album} style={styles.cover} />
-        <View style={styles.textBox}>
-          <Text style={styles.title}>{item.title}</Text>
-          <Text style={styles.artist}>{item.artist}</Text>
-        </View>
+        <Cassette
+          color={item.color}
+          album={item.album}
+          title={item.title}
+          artist={item.artist}
+          sharedTransitionTag={`cassette-${item.id}`}
+        />
       </Animated.View>
     </TouchableOpacity>
   );
@@ -100,16 +106,93 @@ function CassetteCard({
 export default function LibraryScreen() {
   const router = useRouter();
   const theme = useTheme() as WalkmanThemeType;
+  const { playlist, addToPlaylist, loadPlaylist } = usePlayerStore();
+  const [showPlaylist, setShowPlaylist] = useState(false);
 
   const openPlayer = (id: string) => {
     router.push(`/player?id=${id}`);
   };
 
+  const addTrackToPlaylist = (track: any) => {
+    const isAlreadyInPlaylist = playlist.some((t: any) => t.id === track.id);
+    
+    if (isAlreadyInPlaylist) {
+      Alert.alert(
+        "Already in Playlist",
+        "This track is already in your playlist!",
+        [{ text: "OK" }]
+      );
+      return;
+    }
+
+    addToPlaylist(track);
+    Alert.alert(
+      "Added to Playlist",
+      `${track.title} has been added to your playlist.`,
+      [
+        { text: "Keep Browsing", style: "cancel" },
+        { 
+          text: "View Playlist", 
+          onPress: () => setShowPlaylist(true) 
+        },
+      ]
+    );
+  };
+
+  const addAllToPlaylist = () => {
+    Alert.alert(
+      "Add All Tracks",
+      "Add all tracks to your current playlist?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Add All",
+          onPress: () => {
+            loadPlaylist(songs);
+            Alert.alert(
+              "Playlist Updated",
+              "All tracks have been added to your playlist.",
+              [
+                { text: "OK" },
+                { 
+                  text: "View Playlist", 
+                  onPress: () => setShowPlaylist(true) 
+                },
+              ]
+            );
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <Text style={[styles.header, { color: theme.colors.primary }]}>
-        My Cassette Shelf 🎶
-      </Text>
+      <View style={styles.headerSection}>
+        <Text style={[styles.header, { color: theme.colors.primary }]}>
+          My Cassette Shelf 🎶
+        </Text>
+        
+        <View style={styles.headerButtons}>
+          <TouchableOpacity
+            style={[styles.headerButton, styles.playlistButton]}
+            onPress={() => setShowPlaylist(true)}
+          >
+            <Text style={styles.headerButtonText}>
+              🎧 Playlist ({playlist.length})
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[styles.headerButton, styles.addAllButton]}
+            onPress={addAllToPlaylist}
+          >
+            <Text style={styles.headerButtonText}>
+              ➕ Add All
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
 
       <FlatList
         data={songs}
@@ -117,8 +200,17 @@ export default function LibraryScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 }}
         renderItem={({ item }) => (
-          <CassetteCard item={item} onPress={() => openPlayer(item.id)} />
+          <CassetteCard 
+            item={item} 
+            onPress={() => openPlayer(item.id)}
+            onAddToPlaylist={() => addTrackToPlaylist(item)}
+          />
         )}
+      />
+
+      <PlaylistManager
+        visible={showPlaylist}
+        onClose={() => setShowPlaylist(false)}
       />
     </View>
   );
@@ -130,42 +222,42 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingTop: 50,
   },
+  headerSection: {
+    alignItems: "center",
+    marginBottom: 20,
+  },
   header: {
     fontSize: 22,
     fontWeight: "700",
-    marginBottom: 20,
+    marginBottom: 15,
+  },
+  headerButtons: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  headerButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 2,
+  },
+  playlistButton: {
+    backgroundColor: "#007AFF",
+    borderColor: "#0056CC",
+  },
+  addAllButton: {
+    backgroundColor: "#34C759",
+    borderColor: "#28A745",
+  },
+  headerButtonText: {
+    color: "#FFF",
+    fontWeight: "600",
+    fontSize: 14,
   },
   card: {
-    width: width * 0.9,
-    height: 130,
-    borderRadius: 14,
     marginBottom: 20,
-    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "flex-start",
-    padding: 12,
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-  },
-  cover: {
-    width: 90,
-    height: 90,
-    borderRadius: 6,
-    marginRight: 15,
-  },
-  textBox: {
-    flexShrink: 1,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#FFF",
-  },
-  artist: {
-    fontSize: 14,
-    marginTop: 4,
-    color: "#DDD",
+    justifyContent: "center",
   },
 });
 

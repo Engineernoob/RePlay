@@ -10,7 +10,12 @@ import { useTheme } from "@react-navigation/native";
 import type { WalkmanThemeType } from "@/constants/walkman-theme";
 import { usePlayerStore } from "@/src/store/playerStore";
 
-export default function LCDDisplay() {
+interface LCDDisplayProps {
+  title?: string;
+  artist?: string;
+}
+
+export default function LCDDisplay({ title, artist }: LCDDisplayProps) {
   const theme = useTheme() as WalkmanThemeType;
   const { isPlaying, currentTime, duration } = usePlayerStore();
 
@@ -31,9 +36,8 @@ export default function LCDDisplay() {
     opacity: flicker.value,
   }));
 
-  const displayText = isPlaying
-    ? `▶ PLAY   ${formatTime(currentTime)} / ${formatTime(duration)}`
-    : `⏸ PAUSE  ${formatTime(currentTime)} / ${formatTime(duration)}`;
+  const statusText = isPlaying ? "▶ PLAY" : "⏸ PAUSE";
+  const timeText = `${formatTime(currentTime)} / ${formatTime(duration)}`;
 
   return (
     <View
@@ -46,19 +50,72 @@ export default function LCDDisplay() {
         },
       ]}
     >
-      <Animated.Text
-        style={[
-          styles.text,
-          animatedStyle,
-          {
-            color: theme.colors.lcdCyan,
-            fontFamily: theme.fonts.display.fontFamily,
-            textShadowColor: theme.colors.lcdCyan,
-          },
-        ]}
-      >
-        {displayText}
-      </Animated.Text>
+      {/* Track and Artist Info */}
+      {(title || artist) && (
+        <Animated.Text
+          style={[
+            styles.trackText,
+            animatedStyle,
+            {
+              color: theme.colors.lcdCyan,
+              fontFamily: theme.fonts.display.fontFamily,
+              textShadowColor: theme.colors.lcdCyan,
+            },
+          ]}
+          numberOfLines={1}
+        >
+          {title && title.toUpperCase()}
+          {title && artist && " • "}
+          {artist && artist.toUpperCase()}
+        </Animated.Text>
+      )}
+      
+      {/* Status and Time */}
+      <View style={styles.statusRow}>
+        <Animated.Text
+          style={[
+            styles.statusText,
+            animatedStyle,
+            {
+              color: theme.colors.lcdCyan,
+              fontFamily: theme.fonts.display.fontFamily,
+              textShadowColor: theme.colors.lcdCyan,
+            },
+          ]}
+        >
+          {statusText}
+        </Animated.Text>
+        
+        <Animated.Text
+          style={[
+            styles.timeText,
+            animatedStyle,
+            {
+              color: theme.colors.lcdCyan,
+              fontFamily: theme.fonts.display.fontFamily,
+              textShadowColor: theme.colors.lcdCyan,
+            },
+          ]}
+        >
+          {timeText}
+        </Animated.Text>
+      </View>
+      
+      {/* Mini VU-style level bars */}
+      <View style={styles.miniVUMeter}>
+        {[...Array(8)].map((_, i) => (
+          <View
+            key={i}
+            style={[
+              styles.miniBar,
+              {
+                opacity: isPlaying && Math.random() > 0.3 ? 0.8 + Math.random() * 0.2 : 0.3,
+                backgroundColor: theme.colors.lcdCyan,
+              },
+            ]}
+          />
+        ))}
+      </View>
     </View>
   );
 }
@@ -66,19 +123,50 @@ export default function LCDDisplay() {
 const styles = StyleSheet.create({
   container: {
     width: 200,
-    height: 60,
+    height: 80,
     borderWidth: 2,
     borderRadius: 4,
-    justifyContent: "center",
-    alignItems: "center",
+    padding: 8,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
     shadowRadius: 6,
   },
-  text: {
-    fontSize: 20,
-    letterSpacing: 1,
+  trackText: {
+    fontSize: 12,
+    letterSpacing: 0.5,
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 8,
+    marginBottom: 4,
+    textAlign: "center",
+  },
+  statusRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  statusText: {
+    fontSize: 14,
+    letterSpacing: 0.5,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 8,
+  },
+  timeText: {
+    fontSize: 14,
+    letterSpacing: 0.5,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 8,
+  },
+  miniVUMeter: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "flex-end",
+    height: 8,
+    gap: 2,
+  },
+  miniBar: {
+    width: 3,
+    height: "100%",
+    borderRadius: 1,
   },
 });
