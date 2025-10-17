@@ -19,7 +19,7 @@ export default function Cassette({ color, album }: CassetteProps) {
     <View style={[styles.container]}>
       {/* Cassette base */}
       <Image
-        source={require("@/assets/images/cassette-base.png")}
+        source={require("@/assets/images/cassette-base-1.png")}
         style={[styles.cassetteImage, { tintColor: color }]}
       />
 
