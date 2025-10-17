@@ -1,24 +1,10 @@
 import React, { useEffect, useRef } from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  ImageBackground,
-} from "react-native";
-import Animated, {
-  useAnimatedStyle,
-  withTiming,
-} from "react-native-reanimated";
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { useLocalSearchParams } from "expo-router";
-import Cassette from "../../components/Cassette";
-import {
-  usePlayerController,
-  usePlayerStore,
-  playSfx,
-} from "../../src/store/playerStore";
+import { usePlayerController, usePlayerStore, playSfx } from "../../src/store/playerStore";
+import Walkman from "../../components/Walkman";
 
-// 🎵 Each cassette = unique song, album cover, and color theme
+// 🎵 Song data
 const songs: Record<
   string,
   { title: string; artist: string; color: string; album: any; audio: any }
@@ -52,7 +38,7 @@ export default function PlayerScreen() {
   const { play, pause, isPlaying, currentTime, duration } = usePlayerStore();
   const hasInserted = useRef(false);
 
-  // attach audio player to selected cassette
+  // Attach player to selected tape
   usePlayerController(song.audio);
 
   const togglePlay = () => (isPlaying ? pause() : play());
@@ -70,61 +56,39 @@ export default function PlayerScreen() {
     }
   }, [isPlaying]);
 
-  // Animate cassette sliding into Walkman deck
-  const cassetteStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateY: withTiming(isPlaying ? 0 : 180, { duration: 800 }) },
-    ],
-  }));
-
   return (
-    <ImageBackground
-      source={require("../../assets/images/walkman.jpg")}
-      style={styles.background}
-      resizeMode="contain"
-    >
-      <View style={styles.container}>
-        {/* Song metadata */}
-        <Text style={[styles.title, { color: song.color }]}>{song.title}</Text>
-        <Text style={styles.artist}>{song.artist}</Text>
+    <View style={styles.container}>
+      <Text style={[styles.title, { color: song.color }]}>{song.title}</Text>
+      <Text style={styles.artist}>{song.artist}</Text>
 
-        {/* Cassette animation */}
-        <Animated.View style={cassetteStyle}>
-          <Cassette color={song.color} album={song.album} />
-        </Animated.View>
+      {/* 🎛 The Walkman deck */}
+      <Walkman cassetteInserted={isPlaying} color={song.color} album={song.album} />
 
-        {/* Play / Pause button */}
-        <TouchableOpacity
-          style={[styles.button, { backgroundColor: song.color }]}
-          onPress={togglePlay}
-        >
-          <Text style={styles.buttonText}>
-            {isPlaying ? "⏸ Pause" : "▶️ Play"}
-          </Text>
-        </TouchableOpacity>
+      {/* Play / Pause button */}
+      <TouchableOpacity
+        style={[styles.button, { backgroundColor: song.color }]}
+        onPress={togglePlay}
+      >
+        <Text style={styles.buttonText}>{isPlaying ? "⏸ Pause" : "▶️ Play"}</Text>
+      </TouchableOpacity>
 
-        {/* Playback progress */}
-        <Text style={styles.time}>
-          {Math.floor(currentTime)} / {Math.floor(duration)} sec
-        </Text>
-      </View>
-    </ImageBackground>
+      {/* Playback time */}
+      <Text style={styles.time}>
+        {Math.floor(currentTime)} / {Math.floor(duration)} sec
+      </Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  background: {
+  container: {
     flex: 1,
     backgroundColor: "#000",
     alignItems: "center",
     justifyContent: "center",
   },
-  container: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
   title: {
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: "bold",
     marginBottom: 8,
   },
@@ -149,3 +113,5 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
 });
+
+
