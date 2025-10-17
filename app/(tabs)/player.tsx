@@ -1,12 +1,12 @@
-import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import React, { useEffect, useRef } from "react";
+import { View, Text, TouchableOpacity, StyleSheet, ImageBackground } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import Animated, { useAnimatedStyle, withTiming } from "react-native-reanimated";
 import { BlurView } from "expo-blur";
-import { usePlayerController, usePlayerStore } from "@/src/store/playerStore";
+import { usePlayerController, usePlayerStore, playSfx } from "@/src/store/playerStore";
 import Cassette from "@/components/Cassette";
 
-// ✅ songs data mapping for quick lookup
+// ✅ songs data mapping
 const songs: Record<string, { audio: any; album: any; color: string; artist: string; title: string }> = {
   "1": {
     title: "On My Mama",
@@ -36,41 +36,74 @@ export default function PlayerScreen() {
   const song = songs[id];
   const { play, pause, isPlaying, currentTime, duration } = usePlayerStore();
 
-  // init audio player for selected song
+  // initialize player
   usePlayerController(song.audio);
 
-  // animation for cassette sliding into deck
+  // track whether cassette already inserted
+  const hasInserted = useRef(false);
+
+  // handle sound effects for insert + close
+  useEffect(() => {
+    if (isPlaying && !hasInserted.current) {
+      hasInserted.current = true;
+
+      // 1️⃣ cassette slides in
+      playSfx(require("@/assets/sfx/tape-cassette-insert.mp3"));
+
+      // 2️⃣ door closes slightly after
+      playSfx(require("@/assets/sfx/closing-tape-cassette.mp3"), 600);
+    }
+  }, [isPlaying]);
+
+  // 3️⃣ eject sound when stopping playback
+  useEffect(() => {
+    if (!isPlaying && hasInserted.current) {
+      playSfx(require("@/assets/sfx/cassette-eject.mp3"));
+      hasInserted.current = false;
+    }
+  }, [isPlaying]);
+
+  // animation for cassette slide
   const cassetteStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: withTiming(isPlaying ? 0 : 200, { duration: 700 }) }],
+    transform: [{ translateY: withTiming(isPlaying ? 0 : 200, { duration: 800 }) }],
   }));
 
   return (
-    <View style={[styles.container, { backgroundColor: "#000" }]}>
-      {/* background glow based on song color */}
-      <BlurView style={[styles.glow, { backgroundColor: song.color }]} intensity={40} tint="dark" />
+    <ImageBackground
+      source={require("@/assets/images/walkman.jpg")}
+      style={styles.background}
+      resizeMode="contain"
+    >
+      <View style={[styles.container]}>
+        <BlurView style={[styles.glow, { backgroundColor: song.color }]} intensity={40} tint="dark" />
 
-      {/* album title */}
-      <Text style={styles.title}>{song.title}</Text>
-      <Text style={styles.artist}>{song.artist}</Text>
+        {/* Info */}
+        <Text style={styles.title}>{song.title}</Text>
+        <Text style={styles.artist}>{song.artist}</Text>
 
-      {/* Cassette animation */}
-      <Animated.View style={[cassetteStyle]}>
-        <Cassette color={song.color} album={song.album} />
-      </Animated.View>
+        {/* Cassette */}
+        <Animated.View style={[cassetteStyle]}>
+          <Cassette color={song.color} album={song.album} />
+        </Animated.View>
 
-      {/* Controls */}
-      <TouchableOpacity style={[styles.button, { backgroundColor: song.color }]} onPress={() => (isPlaying ? pause() : play())}>
-        <Text style={styles.buttonText}>{isPlaying ? "⏸ Pause" : "▶️ Play"}</Text>
-      </TouchableOpacity>
+        {/* Controls */}
+        <TouchableOpacity
+          style={[styles.button, { backgroundColor: song.color }]}
+          onPress={() => (isPlaying ? pause() : play())}
+        >
+          <Text style={styles.buttonText}>{isPlaying ? "⏸ Pause" : "▶️ Play"}</Text>
+        </TouchableOpacity>
 
-      <Text style={styles.time}>
-        {Math.floor(currentTime)} / {Math.floor(duration)} sec
-      </Text>
-    </View>
+        <Text style={styles.time}>
+          {Math.floor(currentTime)} / {Math.floor(duration)} sec
+        </Text>
+      </View>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
+  background: { flex: 1, backgroundColor: "#000", alignItems: "center", justifyContent: "center" },
   container: { flex: 1, alignItems: "center", justifyContent: "center", position: "relative" },
   glow: {
     position: "absolute",
@@ -92,6 +125,7 @@ const styles = StyleSheet.create({
   buttonText: { color: "#FFF", fontSize: 18, fontWeight: "700" },
   time: { color: "#999", marginTop: 15 },
 });
+
 
 
 

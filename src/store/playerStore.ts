@@ -4,8 +4,10 @@ import {
   useAudioPlayerStatus,
   setAudioModeAsync,
 } from "expo-audio";
+import { Audio } from "expo-av";
 import { useEffect } from "react";
 
+// ---------- Zustand Player State ---------- //
 type PlayerState = {
   isInitialized: boolean;
   isPlaying: boolean;
@@ -26,13 +28,12 @@ export const usePlayerStore = create<PlayerState>(() => ({
   seekTo: () => {},
 }));
 
-// Hook to attach Expo Audio player and sync Zustand
+// ---------- Expo Audio Player Hook ---------- //
 export function usePlayerController(source: any) {
-  // create player and status hooks from expo-audio
   const player = useAudioPlayer(source, { updateInterval: 200 });
   const status = useAudioPlayerStatus(player);
 
-  // Configure audio mode
+  // Configure global audio behavior
   useEffect(() => {
     (async () => {
       await setAudioModeAsync({
@@ -56,3 +57,56 @@ export function usePlayerController(source: any) {
     });
   }, [status, player]);
 }
+
+// ---------- Sound Effects Utility ---------- //
+
+/**
+ * A reusable sound effect manager to prevent overlapping SFX.
+ * It ensures only one instance of a specific effect plays at a time.
+ */
+const activeSfx: Record<string, Audio.Sound | null> = {};
+
+/**
+ * Plays a short sound effect (e.g., cassette insert, close, eject)
+ * with optional delay and overlap protection.
+ */
+export async function playSfx(soundPath: any, delay = 0) {
+  try {
+    // Create a unique key for this sound
+    const key = JSON.stringify(soundPath);
+
+    // Prevent overlapping sound playback
+    if (activeSfx[key]) {
+      const status = await activeSfx[key]?.getStatusAsync();
+      if (status?.isLoaded && status?.isPlaying) {
+        return; // already playing → skip
+      }
+    }
+
+    // Wait before playback if needed
+    setTimeout(async () => {
+      // If a previous instance exists, unload it first
+      if (activeSfx[key]) {
+        await activeSfx[key]?.unloadAsync();
+        activeSfx[key] = null;
+      }
+
+      // Load and play the new sound
+      const { sound } = await Audio.Sound.createAsync(soundPath);
+      activeSfx[key] = sound;
+
+      await sound.playAsync();
+
+      // Cleanup after playback ends
+      sound.setOnPlaybackStatusUpdate(async (status) => {
+        if (status.isLoaded && !status.isPlaying && (status as any).didJustFinish) {
+          await sound.unloadAsync();
+          activeSfx[key] = null;
+        }
+      });
+    }, delay);
+  } catch (err) {
+    console.warn("SFX error:", err);
+  }
+}
+
