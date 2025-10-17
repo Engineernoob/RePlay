@@ -28,7 +28,7 @@ const songs = [
     id: "3",
     title: "Paint the Town Red",
     artist: "Doja Cat",
-    file: require("@/assets/mp3s/PainttheTownRed.mp3"),
+    file: require("@/assets/mp3s/PaintTheTownRed.mp3"),
     cover: require("@/assets/images/covers/Paint-The-Town-Red.png"),
   },
 ];

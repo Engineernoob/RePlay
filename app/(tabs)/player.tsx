@@ -25,7 +25,7 @@ const songs: Record<string, { audio: any; album: any; color: string; artist: str
   "3": {
     title: "Paint the Town Red",
     artist: "Doja Cat",
-    audio: require("@/assets/mp3s/Paint-The-Town-Red.mp3"),
+    audio: require("@/assets/mp3s/PaintTheTownRed.mp3"),
     album: require("@/assets/images/covers/Paint-The-Town-Red.png"),
     color: "#D62D2D",
   },
