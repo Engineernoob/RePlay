@@ -14,16 +14,16 @@ import Animated, {
   withSpring,
   withTiming,
 } from "react-native-reanimated";
-import { router } from "expo-router"; // ✅ correct import
+import { router } from "expo-router"; // ✅ correct navigation hook
 import { useTheme } from "@react-navigation/native";
-import type { WalkmanThemeType } from "@/constants/replay-theme";
+import type { ReplayThemeType } from "@/constants/replay-theme";
 
 const songs = [
   {
     id: "1",
     title: "On My Mama",
     artist: "Victoria Monét",
-    audio: require("@/assets/mp3s/OnMyMama.mp3"), // ✅ added
+    audio: require("@/assets/mp3s/OnMyMama.mp3"),
     album: require("@/assets/images/covers/VictoriaMonet.png"),
     color: "#FF7E57",
   },
@@ -31,7 +31,7 @@ const songs = [
     id: "2",
     title: "Timeless",
     artist: "The Weeknd & Playboi Carti",
-    audio: require("@/assets/mp3s/Timeless.mp3"), // ✅ added
+    audio: require("@/assets/mp3s/Timeless.mp3"),
     album: require("@/assets/images/covers/Timeless.png"),
     color: "#7E57FF",
   },
@@ -39,7 +39,7 @@ const songs = [
     id: "3",
     title: "Paint the Town Red",
     artist: "Doja Cat",
-    audio: require("@/assets/mp3s/PaintTheTownRed.mp3"), // ✅ added
+    audio: require("@/assets/mp3s/PaintTheTownRed.mp3"),
     album: require("@/assets/images/covers/Paint-The-Town-Red.png"),
     color: "#D62D2D",
   },
@@ -100,14 +100,24 @@ function CassetteCard({
 }
 
 export default function LibraryScreen() {
-  const theme = useTheme() as WalkmanThemeType;
+  const theme = useTheme() as ReplayThemeType;
 
-  const openPlayer = (id: string) => {
-    router.push(`/player?id=${id}`); // ✅ use router directly
+  const openPlayer = (item: (typeof songs)[0]) => {
+    router.push({
+      pathname: "/player",
+      params: {
+        id: item.id,
+        title: item.title,
+        artist: item.artist,
+        color: item.color,
+      },
+    });
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <View
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
+    >
       <Text style={[styles.header, { color: theme.colors.primary }]}>
         My Cassette Shelf 🎶
       </Text>
@@ -118,7 +128,7 @@ export default function LibraryScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 }}
         renderItem={({ item }) => (
-          <CassetteCard item={item} onPress={() => openPlayer(item.id)} />
+          <CassetteCard item={item} onPress={() => openPlayer(item)} />
         )}
       />
     </View>
@@ -169,5 +179,3 @@ const styles = StyleSheet.create({
     color: "#DDD",
   },
 });
-
-

@@ -5,7 +5,7 @@ import { usePlayerController, usePlayerStore } from "@/src/store/playerStore";
 import Cassette from "@/components/Cassette";
 import LCDDisplay from "@/components/LCDDisplay";
 import VUMeter from "@/components/VUMeter";
-import { WalkmanThemeType } from "@/constants/replay-theme";
+import { ReplayThemeType } from "@/constants/replay-theme";
 import { useTheme } from "@react-navigation/native";
 import Animated, {
   useAnimatedStyle,
@@ -43,7 +43,7 @@ export default function PlayerScreen() {
   const { id = "1" } = useLocalSearchParams<{ id?: string }>();
   const song = songs[id];
   const { play, pause, isPlaying } = usePlayerStore();
-  const theme = useTheme() as WalkmanThemeType;
+  const theme = useTheme() as ReplayThemeType;
 
   // initialize player
   usePlayerController(song.audio);

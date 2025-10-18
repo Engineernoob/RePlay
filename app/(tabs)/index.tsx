@@ -1,86 +1,53 @@
 import React from "react";
-import {
-  View,
-  FlatList,
-  Text,
-  TouchableOpacity,
-  Image,
-  StyleSheet,
-} from "react-native";
-import { Link } from "expo-router";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import Walkman from "@/components/Walkman"; // ✅ main player body
+import { usePlayerStore } from "@/src/store/playerStore"; // ✅ Zustand player state
 
-const songs = [
-  {
-    id: "1",
-    title: "On my Mama",
-    artist: "Victoria Monét",
-    file: require("@/assets/mp3s/OnMyMama.mp3"),
-    cover: require("@/assets/images/covers/VictoriaMonet.png"),
-  },
-  {
-    id: "2",
-    title: "Timeless",
-    artist: "The Weeknd feat Playboy Carti",
-    file: require("@/assets/mp3s/Timeless.mp3"),
-    cover: require("@/assets/images/covers/Timeless.png"),
-  },
-  {
-    id: "3",
-    title: "Paint the Town Red",
-    artist: "Doja Cat",
-    file: require("@/assets/mp3s/PaintTheTownRed.mp3"),
-    cover: require("@/assets/images/covers/Paint-The-Town-Red.png"),
-  },
-];
+export default function IndexScreen() {
+  const { isPlaying, play, pause } = usePlayerStore();
 
-export default function LibraryScreen() {
+  const togglePlay = () => {
+    if (isPlaying) pause();
+    else play();
+  };
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>🎵 My Cassette Library</Text>
+      {/* Walkman device */}
+      <Walkman />
 
-      <FlatList
-        data={songs}
-        keyExtractor={(item) => item.id}
-        numColumns={2}
-        columnWrapperStyle={{ justifyContent: "space-around" }}
-        renderItem={({ item }) => (
-          <Link
-            href={{
-              pathname: "/player",
-              params: { id: item.id, title: item.title },
-            }}
-            asChild
-          >
-            <TouchableOpacity style={styles.cassetteCard}>
-              <Image source={item.cover} style={styles.cassetteImage} />
-              <Text style={styles.cassetteTitle}>{item.title}</Text>
-              <Text style={styles.cassetteArtist}>{item.artist}</Text>
-            </TouchableOpacity>
-          </Link>
-        )}
-      />
+      {/* Controls */}
+      <TouchableOpacity
+        onPress={togglePlay}
+        style={[
+          styles.button,
+          { backgroundColor: isPlaying ? "#D62D2D" : "#FFDD57" },
+        ]}
+      >
+        <Text style={styles.buttonText}>
+          {isPlaying ? "⏸ Pause" : "▶️ Play"}
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#111", paddingTop: 60 },
-  title: {
-    color: "#FFDD57",
-    fontSize: 26,
-    textAlign: "center",
-    marginBottom: 20,
-  },
-  cassetteCard: {
+  container: {
+    flex: 1,
+    backgroundColor: "#0C2233",
     alignItems: "center",
-    marginVertical: 15,
+    justifyContent: "center",
   },
-  cassetteImage: {
-    width: 150,
-    height: 100,
-    resizeMode: "contain",
-    marginBottom: 8,
+  button: {
+    marginTop: 40,
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderRadius: 12,
   },
-  cassetteTitle: { color: "#FFF", fontWeight: "600", fontSize: 16 },
-  cassetteArtist: { color: "#aaa", fontSize: 12 },
+  buttonText: {
+    color: "#000",
+    fontSize: 18,
+    fontWeight: "700",
+  },
 });
