@@ -16,8 +16,8 @@ export interface Track {
   id: string;
   title: string;
   artist: string;
-  audio: any;   // local require()
-  album: any;   // cover image
+  audio: any; // local require()
+  album: any; // cover image
   color: string;
 }
 
@@ -55,7 +55,7 @@ interface PlayerState extends PlaylistState {
   pause: () => void;
   togglePlayPause: () => void;
   seekTo: (seconds: number) => void;
-  
+
   /* ───── Tape Simulation Controls ───── */
   rewind: (seconds: number) => void;
   fastForward: (seconds: number) => void;
@@ -77,7 +77,7 @@ interface PlayerState extends PlaylistState {
   toggleShuffle: () => void;
   setRepeatMode: (mode: "none" | "one" | "all") => void;
   loadPlaylist: (tracks: Track[]) => void;
-  
+
   /* ───── Advanced Playlist Management ───── */
   enqueueNext: (track: Track) => void;
   addTracks: (tracks: Track[]) => void;
@@ -165,11 +165,11 @@ export const usePlayerStore = create<PlayerState>()(
         const { player } = get();
         const normalizedLevel = Math.max(0, Math.min(1, level));
         set({ volume: normalizedLevel });
-        
+
         // Note: expo-audio AudioPlayer doesn't expose setVolume method directly
         // Volume control should be implemented at the player instance level
         // This is a placeholder for future implementation
-        if (player && 'volume' in player) {
+        if (player && "volume" in player) {
           try {
             (player as any).volume = normalizedLevel;
           } catch (error) {
@@ -182,11 +182,11 @@ export const usePlayerStore = create<PlayerState>()(
         const { player } = get();
         const normalizedRate = Math.max(0.5, Math.min(2.0, rate));
         set({ playbackRate: normalizedRate });
-        
+
         // Note: expo-audio AudioPlayer doesn't expose setRate method directly
         // Playback rate control should be implemented at the player instance level
         // This is a placeholder for future implementation
-        if (player && 'rate' in player) {
+        if (player && "rate" in player) {
           try {
             (player as any).rate = normalizedRate;
           } catch (error) {
@@ -207,9 +207,9 @@ export const usePlayerStore = create<PlayerState>()(
       playSfx: async (name) => {
         try {
           const sfxMap = {
-            insert: require("../../assets/sfx/insert.wav"),
-            eject: require("../../assets/sfx/eject.wav"),
-            click: require("../../assets/sfx/click.wav"),
+            insert: require("../../assets/sfx/tape-cassette-insert.mp3"),
+            eject: require("../../assets/sfx/cassette-eject.mp3"),
+            click: require("../../assets/sfx/button-click.mp3"),
           };
           // Note: This will need to be implemented with expo-audio
           // For now, it's a placeholder for future SFX implementation
@@ -301,13 +301,13 @@ export const usePlayerStore = create<PlayerState>()(
       shufflePlaylist: () => {
         const { playlist } = get();
         const shuffled = [...playlist];
-        
+
         // Fisher–Yates shuffle
         for (let i = shuffled.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
           [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
         }
-        
+
         set({ playlist: shuffled, currentTrackIndex: 0 });
       },
 
@@ -318,7 +318,7 @@ export const usePlayerStore = create<PlayerState>()(
           tracks: playlist,
           createdAt: new Date().toISOString(),
         };
-        
+
         set((state) => ({
           savedPlaylists: [...state.savedPlaylists, newSavedPlaylist],
         }));
@@ -335,40 +335,43 @@ export const usePlayerStore = create<PlayerState>()(
       autoPlaylist: (mode) => {
         const { playlist } = get();
         let filtered = [...playlist];
-        
+
         switch (mode) {
           case "retro":
-            filtered = filtered.filter((track) => 
-              track.title.toLowerCase().includes("retro") ||
-              track.artist.toLowerCase().includes("vintage")
+            filtered = filtered.filter(
+              (track) =>
+                track.title.toLowerCase().includes("retro") ||
+                track.artist.toLowerCase().includes("vintage")
             );
             break;
           case "party":
-            filtered = filtered.filter((track) => 
-              track.title.toLowerCase().includes("party") ||
-              track.title.toLowerCase().includes("dance")
+            filtered = filtered.filter(
+              (track) =>
+                track.title.toLowerCase().includes("party") ||
+                track.title.toLowerCase().includes("dance")
             );
             break;
           case "chill":
-            filtered = filtered.filter((track) => 
-              track.title.toLowerCase().includes("chill") ||
-              track.title.toLowerCase().includes("relax")
+            filtered = filtered.filter(
+              (track) =>
+                track.title.toLowerCase().includes("chill") ||
+                track.title.toLowerCase().includes("relax")
             );
             break;
         }
-        
+
         set({ playlist: filtered, currentTrackIndex: 0 });
       },
 
       suggestNextTrack: () => {
         const { playlist, currentTrack } = get();
         if (playlist.length === 0 || !currentTrack) return null;
-        
+
         // Placeholder for AI-powered suggestions
         // For now, return a random track that's not the current one
         const otherTracks = playlist.filter((t) => t.id !== currentTrack.id);
         if (otherTracks.length === 0) return null;
-        
+
         const randomIndex = Math.floor(Math.random() * otherTracks.length);
         return otherTracks[randomIndex];
       },
@@ -462,11 +465,8 @@ export function usePlayerController(track?: Track) {
       pause: () => player.pause(),
       seekTo: (t) => player.seekTo(t),
     });
-    
+
     // Update reel rotation when time changes
     usePlayerStore.getState().setReelRotation();
   }, [status, player, track]);
 }
-
-
-
