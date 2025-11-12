@@ -38,6 +38,7 @@ export default function IndexScreen() {
       // Fallback: Load first track if no cassette
       loadTrack(AVAILABLE_TRACKS[0]);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const togglePlay = () => {

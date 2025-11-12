@@ -16,6 +16,7 @@
     "@react-navigation/bottom-tabs": "^7.4.0",
     "@react-navigation/elements": "^2.6.3",
     "@react-navigation/native": "^7.1.8",
+    "bootstrap-icons": "^1.13.1",
     "expo": "54.0.23",
     "expo-audio": "~1.0.14",
     "expo-blur": "~15.0.7",

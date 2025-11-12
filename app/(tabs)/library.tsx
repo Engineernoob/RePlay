@@ -37,8 +37,8 @@ export default function LibraryScreen() {
     loadCassette,
     removeCassette,
     renameCassette,
-    activeCassetteId,
     getLastPlayedCassette,
+    activeCassetteId,
   } = useLibraryStore();
   const { loadPlaylist, loadTrack, currentTrack } = usePlayerStore();
 
@@ -60,7 +60,8 @@ export default function LibraryScreen() {
   const handleLoadCassette = (cassetteId: string) => {
     const cassette = loadCassette(cassetteId);
     if (cassette) {
-      // Set active cassette in player store
+      // Set active cassette in both stores
+      useLibraryStore.getState().setActiveCassette(cassetteId);
       usePlayerStore.getState().setActiveCassetteId(cassetteId);
       
       // Load tracks into player

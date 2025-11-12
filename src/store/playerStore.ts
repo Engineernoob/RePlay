@@ -8,7 +8,8 @@ import {
   type AudioPlayer,
 } from "expo-audio";
 import { useEffect } from "react";
-import type { Track, PlayerError, PlayerErrorType } from "@/src/types/audio";
+import type { Track, PlayerError } from "@/src/types/audio";
+import { PlayerErrorType } from "@/src/types/audio";
 
 /* ────────────────────────────────
    TYPES
@@ -144,28 +145,49 @@ export const usePlayerStore = create<PlayerState>()(
         }
       },
 
-      play: () => {
+      play: async () => {
         try {
-          const { player, powerOn, currentTrack } = get();
+          const { player, powerOn, currentTrack, isLoading, isInitialized } = get();
           if (!currentTrack) {
             console.warn("No track loaded");
             return;
           }
-          if (player && powerOn) {
-            player.play().catch((error) => {
-              console.error("Play error:", error);
-              set({
-                error: {
-                  type: PlayerErrorType.PLAY_ERROR,
-                  message: error instanceof Error ? error.message : "Failed to play track",
-                },
-              });
-            });
-            set({ error: null });
-          } else if (!powerOn) {
+          if (!powerOn) {
             console.warn("Player is powered off");
-          } else if (!player) {
+            return;
+          }
+          if (!player) {
             console.warn("Audio player not initialized");
+            return;
+          }
+          
+          // Wait for player to be loaded if it's still loading
+          if (isLoading || !isInitialized) {
+            // Wait for the player to load (max 2 seconds)
+            let attempts = 0;
+            while ((get().isLoading || !get().isInitialized) && attempts < 20) {
+              await new Promise((resolve) => setTimeout(resolve, 100));
+              attempts++;
+            }
+            
+            // If still not ready, log warning but try anyway
+            if (get().isLoading || !get().isInitialized) {
+              console.warn("Player may not be fully loaded, attempting to play anyway");
+            }
+          }
+          
+          try {
+            await player.play();
+            set({ error: null, isPlaying: true });
+          } catch (error) {
+            console.error("Play error:", error);
+            set({
+              error: {
+                type: PlayerErrorType.PLAY_ERROR,
+                message: error instanceof Error ? error.message : "Failed to play track",
+              },
+              isPlaying: false,
+            });
           }
           get().playSfx("click");
         } catch (error) {
@@ -174,6 +196,7 @@ export const usePlayerStore = create<PlayerState>()(
               type: PlayerErrorType.PLAY_ERROR,
               message: error instanceof Error ? error.message : "Failed to play track",
             },
+            isPlaying: false,
           });
         }
       },
@@ -526,7 +549,7 @@ export function usePlayerController(track?: Track) {
   // Update store when player status or track changes
   useEffect(() => {
     const stateUpdate: Partial<PlayerState> = {
-      isInitialized: !!track,
+      isInitialized: !!track && !!player && status.isLoaded,
       isPlaying: status.playing || false,
       duration: status.duration || 0,
       currentTime: status.currentTime || 0,
@@ -559,4 +582,11 @@ export function usePlayerController(track?: Track) {
       usePlayerStore.getState().syncMemory();
     }
   }, [status, player, track]);
+  
+  // Ensure player is ready before allowing playback
+  useEffect(() => {
+    if (track && player && status.isLoaded && status.error) {
+      console.warn("Player error detected:", status.error);
+    }
+  }, [track, player, status.isLoaded, status.error]);
 }
