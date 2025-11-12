@@ -17,6 +17,8 @@ import { useLibraryStore } from "@/src/store/libraryStore";
 import { usePlayerStore } from "@/src/store/playerStore";
 import CassetteCard from "@/components/CassetteCard";
 import type { Cassette } from "@/src/store/libraryStore";
+import { getAvailableMP3Tracks } from "@/src/utils/mp3Loader";
+import type { Track } from "@/src/types/audio";
 
 const { width } = Dimensions.get("window");
 const CASSETTE_COLORS = [
@@ -40,12 +42,14 @@ export default function LibraryScreen() {
     getLastPlayedCassette,
     activeCassetteId,
   } = useLibraryStore();
-  const { loadPlaylist, loadTrack, currentTrack } = usePlayerStore();
+  const { loadPlaylist, loadTrack, currentTrack, playlist: currentPlaylist } = usePlayerStore();
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [newCassetteName, setNewCassetteName] = useState("");
   const [selectedColor, setSelectedColor] = useState(CASSETTE_COLORS[0]);
   const [editingCassette, setEditingCassette] = useState<Cassette | null>(null);
+  const [showTrackSelector, setShowTrackSelector] = useState(false);
+  const [selectedTracks, setSelectedTracks] = useState<Track[]>([]);
 
   const lastPlayedCassette = getLastPlayedCassette();
 
@@ -95,19 +99,26 @@ export default function LibraryScreen() {
       return;
     }
 
+    // Use selected tracks if available, otherwise use current playlist
     const currentPlaylist = usePlayerStore.getState().playlist;
-    const tracksToSave = currentPlaylist.length > 0 
-      ? currentPlaylist 
-      : []; // Could also allow selecting from available tracks
+    const tracksToSave = selectedTracks.length > 0 
+      ? selectedTracks 
+      : currentPlaylist.length > 0 
+        ? currentPlaylist 
+        : [];
 
     if (tracksToSave.length === 0) {
       Alert.alert(
         "No Tracks",
-        "Your current playlist is empty. Add some tracks first!",
+        "Please select tracks from MP3 files or add tracks to your playlist first!",
         [
           {
-            text: "OK",
-            onPress: () => router.push("/explore"),
+            text: "Select MP3 Files",
+            onPress: () => setShowTrackSelector(true),
+          },
+          {
+            text: "Cancel",
+            style: "cancel",
           },
         ]
       );
@@ -122,7 +133,20 @@ export default function LibraryScreen() {
 
     setNewCassetteName("");
     setSelectedColor(CASSETTE_COLORS[0]);
+    setSelectedTracks([]);
     setShowAddModal(false);
+    setShowTrackSelector(false);
+  };
+
+  const handleToggleTrack = (track: Track) => {
+    setSelectedTracks((prev) => {
+      const isSelected = prev.some((t) => t.id === track.id);
+      if (isSelected) {
+        return prev.filter((t) => t.id !== track.id);
+      } else {
+        return [...prev, track];
+      }
+    });
   };
 
   const handleEditCassette = (cassette: Cassette) => {
@@ -286,12 +310,81 @@ export default function LibraryScreen() {
               ))}
             </View>
 
+            {/* Track Selection Section */}
+            {!editingCassette && (
+              <>
+                <TouchableOpacity
+                  style={[styles.selectTracksButton, { backgroundColor: theme.colors.primary }]}
+                  onPress={() => setShowTrackSelector(!showTrackSelector)}
+                >
+                  <Text style={styles.selectTracksButtonText}>
+                    {showTrackSelector ? "Hide" : "Select"} MP3 Files
+                    {selectedTracks.length > 0 && ` (${selectedTracks.length} selected)`}
+                  </Text>
+                </TouchableOpacity>
+
+                {showTrackSelector && (
+                  <View style={styles.trackSelectorContainer}>
+                    <Text style={[styles.trackSelectorTitle, { color: theme.colors.text }]}>
+                      Available MP3 Files:
+                    </Text>
+                    <FlatList
+                      data={getAvailableMP3Tracks()}
+                      keyExtractor={(item) => item.id}
+                      style={styles.trackList}
+                      renderItem={({ item }) => {
+                        const isSelected = selectedTracks.some((t) => t.id === item.id);
+                        return (
+                          <TouchableOpacity
+                            style={[
+                              styles.trackItem,
+                              {
+                                backgroundColor: isSelected 
+                                  ? theme.colors.primary 
+                                  : theme.colors.background,
+                                borderColor: theme.colors.border,
+                              },
+                            ]}
+                            onPress={() => handleToggleTrack(item)}
+                          >
+                            <Text
+                              style={[
+                                styles.trackItemText,
+                                {
+                                  color: isSelected 
+                                    ? theme.colors.background 
+                                    : theme.colors.text,
+                                },
+                              ]}
+                            >
+                              {item.title} - {item.artist}
+                            </Text>
+                            {isSelected && (
+                              <Text style={styles.checkmark}>✓</Text>
+                            )}
+                          </TouchableOpacity>
+                        );
+                      }}
+                    />
+                  </View>
+                )}
+
+                {selectedTracks.length === 0 && (
+                  <Text style={[styles.hintText, { color: theme.colors.secondaryText }]}>
+                    Or use your current playlist ({currentPlaylist.length} tracks)
+                  </Text>
+                )}
+              </>
+            )}
+
             <View style={styles.modalActions}>
               <TouchableOpacity
                 style={[styles.modalButton, styles.cancelButton]}
                 onPress={() => {
                   setShowAddModal(false);
                   setEditingCassette(null);
+                  setSelectedTracks([]);
+                  setShowTrackSelector(false);
                 }}
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
@@ -469,5 +562,55 @@ const styles = StyleSheet.create({
     color: "#000",
     fontSize: 16,
     fontWeight: "700",
+  },
+  selectTracksButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginTop: 16,
+    marginBottom: 12,
+    alignItems: "center",
+  },
+  selectTracksButtonText: {
+    color: "#000",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  trackSelectorContainer: {
+    maxHeight: 200,
+    marginTop: 12,
+    marginBottom: 12,
+  },
+  trackSelectorTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 8,
+  },
+  trackList: {
+    maxHeight: 150,
+  },
+  trackItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 12,
+    marginBottom: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  trackItemText: {
+    fontSize: 14,
+    flex: 1,
+  },
+  checkmark: {
+    fontSize: 18,
+    color: "#00F5FF",
+    fontWeight: "bold",
+  },
+  hintText: {
+    fontSize: 12,
+    textAlign: "center",
+    marginTop: 8,
+    fontStyle: "italic",
   },
 });

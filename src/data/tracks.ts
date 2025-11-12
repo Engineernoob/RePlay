@@ -1,44 +1,13 @@
 import { Track } from "@/src/types/audio";
+import { getAvailableMP3Tracks } from "@/src/utils/mp3Loader";
 
 /**
  * Centralized track data source
- * This replaces hardcoded arrays scattered throughout the app
+ * Automatically loads tracks from MP3 configuration
+ * 
+ * To add new tracks, update src/config/mp3Config.ts
  */
-export const AVAILABLE_TRACKS: Track[] = [
-  {
-    id: "1",
-    title: "On My Mama",
-    artist: "Victoria Monét",
-    audio: require("@/assets/mp3s/OnMyMama.mp3"),
-    album: require("@/assets/images/covers/VictoriaMonet.png"),
-    color: "#FF7E57",
-    genre: "R&B",
-    year: "2023",
-    albumName: "JAGUAR",
-  },
-  {
-    id: "2",
-    title: "Timeless",
-    artist: "The Weeknd & Playboi Carti",
-    audio: require("@/assets/mp3s/Timeless.mp3"),
-    album: require("@/assets/images/covers/Timeless.png"),
-    color: "#7E57FF",
-    genre: "Hip-Hop",
-    year: "2024",
-    albumName: "Timeless",
-  },
-  {
-    id: "3",
-    title: "Paint the Town Red",
-    artist: "Doja Cat",
-    audio: require("@/assets/mp3s/PaintTheTownRed.mp3"),
-    album: require("@/assets/images/covers/Paint-The-Town-Red.png"),
-    color: "#D62D2D",
-    genre: "Pop",
-    year: "2023",
-    albumName: "Scarlet",
-  },
-];
+export const AVAILABLE_TRACKS: Track[] = getAvailableMP3Tracks();
 
 /**
  * Get track by ID

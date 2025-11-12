@@ -1,12 +1,15 @@
-import React, { useEffect, useMemo } from "react";
-import { View, StyleSheet, TouchableOpacity, Text } from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import { View, StyleSheet, TouchableOpacity, Text, Image } from "react-native";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
   withRepeat,
+  withSpring,
   Easing,
+  interpolate,
 } from "react-native-reanimated";
+import * as Haptics from "expo-haptics";
 import { 
   usePlayerStore,
   usePlayerController
@@ -39,6 +42,8 @@ export default function Walkman() {
     playlist,
     isShuffle,
     toggleShuffle,
+    volume,
+    setVolume,
     repeatMode,
     setRepeatMode,
   } = usePlayerStore();
@@ -49,21 +54,68 @@ export default function Walkman() {
   const progress = useProgress();
   const { formattedTime } = useFormattedTime();
   const { title, artist, hasTrack } = useTrackMetadata();
+  const { isLoading } = usePlayerStore();
+
+  // Cassette insertion/ejection animations
+  const cassetteSlideY = useSharedValue(0);
+  const cassetteScale = useSharedValue(1);
+  const cassetteOpacity = useSharedValue(0);
+  const [isCassetteInserting, setIsCassetteInserting] = useState(false);
 
   // Reel rotation animations
   const leftReelRotation = useSharedValue(0);
   const rightReelRotation = useSharedValue(0);
+  
+  // Tape loading animation
+  const tapeLoadingProgress = useSharedValue(0);
+  const tapeLoadingOpacity = useSharedValue(0);
 
-  // Calculate remaining time
-  const remainingTime = duration > 0 ? duration - currentTime : 0;
-  const remainingMinutes = Math.floor(remainingTime / 60);
-  const remainingSeconds = Math.floor(remainingTime % 60);
-  const remainingTimeStr = `-${remainingMinutes}:${remainingSeconds.toString().padStart(2, "0")}`;
+  // Heart animation
+  const heartScale = useSharedValue(1);
+
+  // Cassette insertion animation
+  useEffect(() => {
+    if (hasTrack && !isCassetteInserting) {
+      setIsCassetteInserting(true);
+      usePlayerStore.getState().playSfx("insert");
+      
+      cassetteSlideY.value = withSpring(0, {
+        damping: 15,
+        stiffness: 200,
+      });
+      cassetteScale.value = withSpring(1, {
+        damping: 15,
+        stiffness: 200,
+      });
+      cassetteOpacity.value = withTiming(1, { duration: 300 });
+      
+      tapeLoadingOpacity.value = withTiming(1, { duration: 200 });
+      tapeLoadingProgress.value = withTiming(1, { 
+        duration: 1500,
+        easing: Easing.inOut(Easing.ease)
+      });
+      
+      setTimeout(() => {
+        tapeLoadingOpacity.value = withTiming(0, { duration: 300 });
+        setIsCassetteInserting(false);
+      }, 1500);
+    } else if (!hasTrack) {
+      usePlayerStore.getState().playSfx("eject");
+      cassetteSlideY.value = withTiming(200, { duration: 400 });
+      cassetteScale.value = withTiming(0.8, { duration: 400 });
+      cassetteOpacity.value = withTiming(0, { duration: 400 });
+      tapeLoadingOpacity.value = 0;
+      tapeLoadingProgress.value = 0;
+    }
+  }, [hasTrack]);
 
   // Reel rotation logic
   useEffect(() => {
     if (isPlaying && powerOn && hasTrack) {
-      const spinDuration = 2000;
+      const baseSpeed = 2000;
+      const speedVariation = 200;
+      const spinDuration = baseSpeed + (Math.random() * speedVariation - speedVariation / 2);
+      
       leftReelRotation.value = withRepeat(
         withTiming(360, { duration: spinDuration, easing: Easing.linear }),
         -1,
@@ -86,6 +138,19 @@ export default function Walkman() {
     }
   }, [isPlaying, powerOn, hasTrack]);
 
+  // Heart animation on play
+  useEffect(() => {
+    if (isPlaying) {
+      heartScale.value = withRepeat(
+        withSpring(1.2, { damping: 5 }),
+        -1,
+        true
+      );
+    } else {
+      heartScale.value = withTiming(1, { duration: 300 });
+    }
+  }, [isPlaying]);
+
   const leftReelStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${leftReelRotation.value}deg` }],
   }));
@@ -94,10 +159,29 @@ export default function Walkman() {
     transform: [{ rotate: `${rightReelRotation.value}deg` }],
   }));
 
+  const cassetteSlideStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateY: cassetteSlideY.value },
+      { scale: cassetteScale.value },
+    ],
+    opacity: cassetteOpacity.value,
+  }));
+
+  const tapeLoadingStyle = useAnimatedStyle(() => ({
+    opacity: tapeLoadingOpacity.value,
+  }));
+  
+  const tapeLoadingBarStyle = useAnimatedStyle(() => ({
+    transform: [{ scaleX: tapeLoadingProgress.value }],
+  }));
+
+  const heartStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: heartScale.value }],
+  }));
+
   const currentTrackIndex = playlist.findIndex(t => t.id === currentTrack?.id) + 1;
   const totalTracks = playlist.length || 1;
 
-  // Calculate right reel tape size based on progress
   const rightReelTape1 = useMemo(() => ({
     width: Math.max(15, 50 * (1 - progress * 0.7)),
     height: Math.max(15, 50 * (1 - progress * 0.7)),
@@ -110,194 +194,197 @@ export default function Walkman() {
     opacity: Math.max(0.2, (1 - progress * 0.5) * 0.8),
   }), [progress]);
 
+  const handleVolumeUp = async () => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setVolume(Math.min(1.0, volume + 0.1));
+  };
+
+  const handleVolumeDown = async () => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setVolume(Math.max(0, volume - 0.1));
+  };
+
   return (
     <View style={styles.container}>
-      {/* Large Cassette Tape - Upper Half */}
-      <View style={styles.cassetteContainer}>
+      {/* Top Screen Section */}
+      <View style={styles.topScreen}>
+        <View style={styles.screenContent}>
+          <Text style={styles.screenText}>SONY PLAYER</Text>
+          <View style={styles.screenIcons}>
+            <Animated.View style={heartStyle}>
+              <Text style={styles.heartIcon}>♥</Text>
+            </Animated.View>
+            <TouchableOpacity
+              onPress={async () => {
+                await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                toggleShuffle();
+              }}
+            >
+              <Text style={[styles.shuffleIcon, isShuffle && styles.shuffleActive]}>
+                ⇄
+              </Text>
+            </TouchableOpacity>
+          </View>
+              </View>
+            </View>
+
+      {/* Middle Control Panel */}
+      <View style={styles.controlPanel}>
+        {/* Speaker Grille */}
+        <View style={styles.speakerGrille}>
+          <View style={styles.grilleHoles}>
+            {Array.from({ length: 20 }).map((_, i) => (
+              <View key={i} style={styles.grilleHole} />
+            ))}
+          </View>
+          <View style={[styles.indicatorLight, { opacity: powerOn ? 1 : 0.3 }]} />
+        </View>
+
+        {/* Volume Controls */}
+        <View style={styles.volumeControls}>
+          <TouchableOpacity
+            style={styles.volumeButton}
+            onPress={handleVolumeDown}
+            disabled={!powerOn}
+          >
+            <Text style={styles.volumeButtonText}>VOL -</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.volumeButton}
+            onPress={handleVolumeUp}
+            disabled={!powerOn}
+          >
+            <Text style={styles.volumeButtonText}>VOL +</Text>
+          </TouchableOpacity>
+                  </View>
+                  
+        {/* Display Text */}
+        <View style={styles.displayTextContainer}>
+          <Text style={styles.displayText}>♥</Text>
+          <Text style={styles.displayTextMain} numberOfLines={1}>
+            {title || "MY LIFE IS GETTING BETTER"}
+          </Text>
+          <Text style={styles.displayText}>♥</Text>
+        </View>
+
+        {/* PLATEK Branding */}
+        <Text style={styles.platekText}>PLATEK</Text>
+
+        {/* Playback Controls */}
+        <View style={styles.playbackControls}>
+              <TouchableOpacity
+            style={[styles.playButton, !powerOn && styles.buttonDisabled]}
+            onPress={async () => {
+              await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              usePlayerStore.getState().playSfx("click");
+              if (isPlaying) pause();
+              else play();
+            }}
+                disabled={!powerOn || !hasTrack}
+              >
+            {isPlaying ? (
+              <PauseIcon size={32} color={!powerOn || !hasTrack ? "#666" : "#FFF"} />
+            ) : (
+              <PlayIcon size={32} color={!powerOn || !hasTrack ? "#666" : "#FFF"} />
+            )}
+              </TouchableOpacity>
+
+          <View style={styles.secondaryControls}>
+              <TouchableOpacity
+              style={[styles.secondaryButton, !powerOn && styles.buttonDisabled]}
+              onPress={async () => {
+                await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                usePlayerStore.getState().playSfx("fastforward");
+                fastForward(5);
+              }}
+                disabled={!powerOn || !hasTrack}
+              >
+              <SkipForwardIcon size={20} color={!powerOn || !hasTrack ? "#666" : "#FFF"} />
+              </TouchableOpacity>
+              <TouchableOpacity
+              style={[styles.secondaryButton, !powerOn && styles.buttonDisabled]}
+              onPress={async () => {
+                await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                usePlayerStore.getState().playSfx("rewind");
+                rewind(5);
+              }}
+                disabled={!powerOn || !hasTrack}
+              >
+              <SkipBackwardIcon size={20} color={!powerOn || !hasTrack ? "#666" : "#FFF"} />
+              </TouchableOpacity>
+          </View>
+
+              <TouchableOpacity
+            style={[styles.stopButton, !powerOn && styles.buttonDisabled]}
+            onPress={async () => {
+              await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              usePlayerStore.getState().playSfx("click");
+              pause();
+              restartTrack();
+            }}
+                disabled={!powerOn || !hasTrack}
+              >
+            <StopIcon size={24} color={!powerOn || !hasTrack ? "#666" : "#FFF"} />
+              </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Bottom Cassette Compartment */}
+      <View style={styles.cassetteCompartment}>
         {hasTrack ? (
-          <View style={styles.cassetteShell}>
-            {/* Transparent cassette casing */}
-            <View style={styles.cassetteFrame}>
-              {/* Brand name vertically on left */}
-              <View style={styles.brandVertical}>
-                <Text style={styles.brandTextVertical}>CASSOFLOW</Text>
+          <Animated.View style={[styles.cassetteWindow, cassetteSlideStyle]}>
+            <View style={styles.cassette}>
+              {/* Maxell Branding */}
+              <View style={styles.cassetteBrand}>
+                <Text style={styles.maxellText}>maxell</Text>
+                <View style={styles.bLogo}>
+                  <Text style={styles.bLogoText}>B</Text>
+                </View>
               </View>
 
-              {/* Cassette Label - Orange and White */}
-              <View style={styles.labelContainer}>
-                {/* Orange section with CFT60 */}
-                <View style={styles.labelOrange}>
-                  <Text style={styles.cft60Text}>CFT60</Text>
-                </View>
-                
-                {/* White section with track info */}
-                <View style={styles.labelWhite}>
-                  <Text style={styles.labelBrand}>CASSOFLOW</Text>
-                  <Text style={styles.labelModel}>MODEL NO. CPM-001</Text>
-                  <Text style={styles.labelType}>AUDIO CASSETTE PLAYER</Text>
-                  <Text style={styles.labelBatt}>(BUILD-IN BATT)</Text>
-                  <Text style={styles.labelStudio}>DESIGN STUDIO</Text>
-                  
-                  {/* Red dots pattern (level meter) */}
-                  <View style={styles.levelMeter}>
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <View key={i} style={styles.levelColumn}>
-                        {Array.from({ length: 8 }).map((_, j) => (
-                          <View
-                            key={j}
-                            style={[
-                              styles.levelDot,
-                              {
-                                opacity: isPlaying && j < 6 ? 1 : 0.3,
-                              },
-                            ]}
-                          />
-                        ))}
-                      </View>
-                    ))}
-                  </View>
-                  
-                  {/* SIDE A triangle */}
-                  <View style={styles.sideIndicator}>
-                    <View style={styles.sideTriangle} />
-                    <Text style={styles.sideText}>SIDE A</Text>
-                  </View>
+              {/* Cassette Label */}
+              <View style={styles.cassetteLabel}>
+                <Text style={styles.labelText}>GREAT FOR EVERYDAY RECORDING</Text>
+                <View style={styles.redLabel}>
+                  <Text style={styles.redLabelText}>
+                    {title?.substring(0, 2).toUpperCase() || "UR"}
+                  </Text>
                 </View>
               </View>
 
               {/* Reels */}
-              <View style={styles.reelsContainer}>
-                {/* Left Reel - Full (tape wound) */}
+              <View style={styles.cassetteReels}>
                 <Animated.View style={[styles.reel, styles.reelLeft, leftReelStyle]}>
                   <View style={styles.reelHub} />
-                  {/* Multiple tape layers to show fullness */}
                   <View style={[styles.reelTape, { width: 50, height: 50 }]} />
                   <View style={[styles.reelTape, { width: 45, height: 45, opacity: 0.8 }]} />
                   <View style={[styles.reelTape, { width: 40, height: 40, opacity: 0.6 }]} />
-                </Animated.View>
+            </Animated.View>
 
-                {/* Right Reel - Less full (shows progress) */}
                 <Animated.View style={[styles.reel, styles.reelRight, rightReelStyle]}>
                   <View style={styles.reelHub} />
-                  {/* Tape amount decreases as progress increases */}
                   <View style={[styles.reelTape, rightReelTape1]} />
                   <View style={[styles.reelTape, rightReelTape2]} />
-                </Animated.View>
+            </Animated.View>
               </View>
 
-              {/* Screws */}
-              <View style={styles.screwTopLeft} />
-              <View style={styles.screwTopRight} />
-              <View style={styles.screwBottomLeft} />
-              <View style={styles.screwBottomRight} />
-              
-              {/* DO NOT INSERT warning */}
-              <Text style={styles.warningText}>DO NOT INSERT</Text>
+              {/* Loading Indicator */}
+              <Animated.View style={[styles.tapeLoadingIndicator, tapeLoadingStyle]}>
+                <View style={styles.tapeLoadingBarContainer}>
+                  <Animated.View style={[styles.tapeLoadingBar, tapeLoadingBarStyle]} />
+                </View>
+              </Animated.View>
             </View>
-          </View>
+            </Animated.View>
         ) : (
           <View style={styles.noCassette}>
             <Text style={styles.noCassetteText}>NO CASSETTE</Text>
           </View>
         )}
 
-        {/* Yellow tape head line */}
-        {hasTrack && <View style={styles.tapeHeadLine} />}
-      </View>
-
-      {/* Controls and Display - Lower Half */}
-      <View style={styles.bottomSection}>
-        {/* Control Buttons Row */}
-        <View style={styles.controlsRow}>
-          <TouchableOpacity
-            style={[styles.controlButton, !powerOn && styles.buttonDisabled]}
-            onPress={() => rewind(5)}
-            disabled={!powerOn || !hasTrack}
-          >
-            <SkipBackwardIcon size={28} color={!powerOn || !hasTrack ? "#666" : "#FFF"} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.controlButton, !powerOn && styles.buttonDisabled]}
-            onPress={() => {
-              if (isPlaying) pause();
-              else play();
-            }}
-            disabled={!powerOn || !hasTrack}
-          >
-            {isPlaying ? (
-              <PauseIcon size={28} color={!powerOn || !hasTrack ? "#666" : "#FFF"} />
-            ) : (
-              <PlayIcon size={28} color={!powerOn || !hasTrack ? "#666" : "#FFF"} />
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.controlButton, !powerOn && styles.buttonDisabled]}
-            onPress={() => {
-              pause();
-              restartTrack();
-            }}
-            disabled={!powerOn || !hasTrack}
-          >
-            <StopIcon size={28} color={!powerOn || !hasTrack ? "#666" : "#FFF"} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.controlButton, !powerOn && styles.buttonDisabled]}
-            onPress={() => fastForward(5)}
-            disabled={!powerOn || !hasTrack}
-          >
-            <SkipForwardIcon size={28} color={!powerOn || !hasTrack ? "#666" : "#FFF"} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.controlButton, styles.settingsButton]}
-            onPress={() => {
-              const nextMode = repeatMode === "none" ? "all" : repeatMode === "all" ? "one" : "none";
-              setRepeatMode(nextMode);
-            }}
-            disabled={!powerOn}
-          >
-            <Text style={[styles.controlIcon, { color: !powerOn ? "#666" : "#FFF" }]}>
-              {repeatMode === "all" ? "🔁" : repeatMode === "one" ? "🔂" : "↻"}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Blue Display Panel */}
-        <View style={styles.displayPanel}>
-          <View style={styles.displayHeader}>
-            <Text style={styles.programNumber}>
-              PGM NO. {currentTrackIndex}/{totalTracks}
-            </Text>
-          </View>
-
-          <View style={styles.displayContent}>
-            <Text style={styles.songTitle}>{title || "NO TRACK"}</Text>
-            <Text style={styles.artistName}>{artist || "---"}</Text>
-          </View>
-
-          {/* Progress Bar */}
-          <View style={styles.progressBarContainer}>
-            <View style={[styles.progressBar, { width: `${progress * 100}%` }]} />
-          </View>
-
-          <View style={styles.displayFooter}>
-            <TouchableOpacity
-              style={styles.shuffleButton}
-              onPress={toggleShuffle}
-              disabled={!powerOn}
-            >
-              <Text style={[styles.shuffleIcon, isShuffle && styles.shuffleActive]}>
-                ⇄
-              </Text>
-            </TouchableOpacity>
-            <Text style={styles.remainingTime}>{remainingTimeStr}</Text>
-            <TouchableOpacity style={styles.soundEffectButton}>
-              <Text style={styles.soundEffectText}>SOUND EFFECT</Text>
-            </TouchableOpacity>
-          </View>
+        {/* Music Panel */}
+        <View style={styles.musicPanel}>
+          <Text style={styles.musicText}>MUSIC</Text>
         </View>
       </View>
     </View>
@@ -307,403 +394,374 @@ export default function Walkman() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#2A2A2A", // Dark grey textured background
+    backgroundColor: "#1A1A1A",
+    alignItems: "center",
+    justifyContent: "center",
     padding: 20,
   },
-  cassetteContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingVertical: 20,
-  },
-  cassetteShell: {
-    width: "90%",
+  // Top Screen
+  topScreen: {
+    width: "100%",
     maxWidth: 400,
-    aspectRatio: 1.6,
-    position: "relative",
-  },
-  cassetteFrame: {
-    flex: 1,
-    backgroundColor: "rgba(220, 220, 220, 0.4)", // Transparent plastic casing
-    borderRadius: 12,
-    borderWidth: 4,
-    borderColor: "#999",
-    padding: 16,
-    position: "relative",
-    overflow: "hidden",
-    // Glass effect
-    borderTopColor: "#CCC",
-    borderLeftColor: "#CCC",
-    borderRightColor: "#888",
-    borderBottomColor: "#888",
-  },
-  brandVertical: {
-    position: "absolute",
-    left: 8,
-    top: 0,
-    bottom: 0,
-    justifyContent: "center",
-    width: 30,
-  },
-  brandTextVertical: {
-    color: "#FFF",
-    fontSize: 16,
-    fontWeight: "900",
-    letterSpacing: 2,
-    transform: [{ rotate: "-90deg" }],
-    textShadowColor: "#000",
-    textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 4,
-  },
-  labelContainer: {
-    flexDirection: "row",
-    height: "50%",
-    marginLeft: 40,
-    marginRight: 20,
-    borderRadius: 4,
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-  },
-  labelOrange: {
-    width: "30%",
-    backgroundColor: "#FF7E57",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 8,
-  },
-  cft60Text: {
-    color: "#FFF",
-    fontSize: 18,
-    fontWeight: "900",
-    letterSpacing: 1,
-  },
-  labelWhite: {
-    flex: 1,
-    backgroundColor: "#FFF",
-    padding: 8,
-    position: "relative",
-  },
-  labelBrand: {
-    fontSize: 8,
-    fontWeight: "700",
-    color: "#000",
-    marginBottom: 2,
-  },
-  labelModel: {
-    fontSize: 7,
-    color: "#333",
-    marginBottom: 1,
-  },
-  labelType: {
-    fontSize: 7,
-    color: "#333",
-    marginBottom: 1,
-  },
-  labelBatt: {
-    fontSize: 7,
-    color: "#666",
-    marginBottom: 1,
-  },
-  labelStudio: {
-    fontSize: 7,
-    color: "#666",
-    marginBottom: 4,
-  },
-  levelMeter: {
-    flexDirection: "row",
-    gap: 2,
-    marginTop: 4,
-    marginBottom: 4,
-  },
-  levelColumn: {
-    flexDirection: "column",
-    gap: 1,
-  },
-  levelDot: {
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: "#D62D2D",
-  },
-  sideIndicator: {
-    position: "absolute",
-    top: 8,
-    right: 8,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  sideTriangle: {
-    width: 0,
-    height: 0,
-    borderLeftWidth: 8,
-    borderRightWidth: 8,
-    borderBottomWidth: 8,
-    borderLeftColor: "transparent",
-    borderRightColor: "transparent",
-    borderBottomColor: "#D62D2D",
-    marginRight: 2,
-  },
-  sideText: {
-    fontSize: 7,
-    fontWeight: "700",
-    color: "#D62D2D",
-  },
-  reelsContainer: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "center",
-    marginTop: 8,
-    paddingHorizontal: 20,
-  },
-  reel: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: "#1A1A1A",
-    borderWidth: 3,
-    borderColor: "#333",
-    justifyContent: "center",
-    alignItems: "center",
-    position: "relative",
-  },
-  reelLeft: {
-    // Left reel appears full
-  },
-  reelRight: {
-    // Right reel shows less tape as progress increases
-  },
-  reelHub: {
-    width: 25,
-    height: 25,
-    borderRadius: 12.5,
-    backgroundColor: "#333",
+    backgroundColor: "#2A2A2A",
+    borderRadius: 8,
     borderWidth: 2,
-    borderColor: "#555",
-  },
-  reelTape: {
-    position: "absolute",
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: "#1A1A1A",
-    borderWidth: 3,
     borderColor: "#333",
-    // Tape layers effect
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 4,
-  },
-  screwTopLeft: {
-    position: "absolute",
-    top: 4,
-    left: 4,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#666",
-    borderWidth: 1,
-    borderColor: "#888",
-  },
-  screwTopRight: {
-    position: "absolute",
-    top: 4,
-    right: 4,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#666",
-    borderWidth: 1,
-    borderColor: "#888",
-  },
-  screwBottomLeft: {
-    position: "absolute",
-    bottom: 4,
-    left: 4,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#666",
-    borderWidth: 1,
-    borderColor: "#888",
-  },
-  screwBottomRight: {
-    position: "absolute",
-    bottom: 4,
-    right: 4,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#666",
-    borderWidth: 1,
-    borderColor: "#888",
-  },
-  warningText: {
-    position: "absolute",
-    bottom: 8,
-    left: "50%",
-    transform: [{ translateX: -40 }],
-    fontSize: 6,
-    color: "#666",
-    fontFamily: "monospace",
-    letterSpacing: 0.5,
-    opacity: 0.7,
-  },
-  tapeHeadLine: {
-    width: "90%",
-    maxWidth: 400,
-    height: 3,
-    backgroundColor: "#FFDD57",
-    marginTop: 8,
-    borderRadius: 2,
-  },
-  noCassette: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  noCassetteText: {
-    color: "#666",
-    fontSize: 18,
-    fontWeight: "700",
-    letterSpacing: 2,
-  },
-  bottomSection: {
-    paddingTop: 20,
-    backgroundColor: "#2A2A2A", // Dark grey textured surface
-  },
-  controlsRow: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 12,
+    padding: 12,
     marginBottom: 20,
-    paddingHorizontal: 20,
-  },
-  controlButton: {
-    width: 50,
-    height: 50,
-    backgroundColor: "#2A2A2A",
-    borderRadius: 8,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#444",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-  },
-  buttonDisabled: {
-    opacity: 0.4,
-  },
-  controlIcon: {
-    fontSize: 24,
-    color: "#FFF",
-  },
-  settingsButton: {
-    width: 50,
-    height: 50,
-    backgroundColor: "#2A2A2A",
-    borderRadius: 8,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#444",
-    marginLeft: "auto",
-  },
-  displayPanel: {
-    backgroundColor: "#00BFFF", // Bright cyan-blue like in image
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 3,
-    borderColor: "#0099CC",
-    shadowColor: "#00BFFF",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.6,
-    shadowRadius: 10,
-    // Inner glow
-    borderTopColor: "#33CCFF",
-    borderLeftColor: "#33CCFF",
-    borderRightColor: "#0088BB",
-    borderBottomColor: "#0088BB",
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
   },
-  displayHeader: {
-    marginBottom: 8,
-  },
-  programNumber: {
-    fontSize: 10,
-    fontWeight: "700",
-    color: "#000",
-    fontFamily: "monospace",
-  },
-  displayContent: {
-    marginBottom: 12,
-  },
-  songTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#000",
-    marginBottom: 4,
-  },
-  artistName: {
-    fontSize: 14,
-    color: "#000",
-    opacity: 0.8,
-  },
-  progressBarContainer: {
-    height: 4,
-    backgroundColor: "rgba(0, 0, 0, 0.2)",
-    borderRadius: 2,
-    marginBottom: 12,
-    overflow: "hidden",
-  },
-  progressBar: {
-    height: "100%",
-    backgroundColor: "#000",
-    borderRadius: 2,
-  },
-  displayFooter: {
+  screenContent: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
-  shuffleButton: {
-    width: 30,
-    height: 30,
-    justifyContent: "center",
+  screenText: {
+    color: "#FFF",
+    fontSize: 14,
+    fontWeight: "700",
+    fontFamily: "monospace",
+    letterSpacing: 1,
+  },
+  screenIcons: {
+    flexDirection: "row",
+    gap: 12,
     alignItems: "center",
   },
+  heartIcon: {
+    color: "#D62D2D",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
   shuffleIcon: {
-    fontSize: 20,
-    color: "#000",
+    color: "#FFF",
+    fontSize: 16,
     opacity: 0.6,
   },
   shuffleActive: {
     opacity: 1,
     fontWeight: "bold",
   },
-  remainingTime: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#000",
-    fontFamily: "monospace",
+  // Control Panel
+  controlPanel: {
+    width: "100%",
+    maxWidth: 400,
+    backgroundColor: "#2A2A2A",
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 2,
+    borderColor: "#333",
   },
-  soundEffectButton: {
-    backgroundColor: "rgba(0, 0, 0, 0.2)",
+  speakerGrille: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+    paddingVertical: 8,
     paddingHorizontal: 12,
+    backgroundColor: "#1A1A1A",
+    borderRadius: 4,
+  },
+  grilleHoles: {
+    flexDirection: "row",
+    gap: 4,
+    flexWrap: "wrap",
+    flex: 1,
+  },
+  grilleHole: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#333",
+  },
+  indicatorLight: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#D62D2D",
+    shadowColor: "#D62D2D",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 4,
+  },
+  volumeControls: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 8,
+    marginBottom: 12,
+  },
+  volumeButton: {
+    backgroundColor: "#1A1A1A",
     paddingVertical: 6,
+    paddingHorizontal: 12,
     borderRadius: 4,
     borderWidth: 1,
-    borderColor: "rgba(0, 0, 0, 0.3)",
+    borderColor: "#333",
   },
-  soundEffectText: {
+  volumeButtonText: {
+    color: "#FFF",
     fontSize: 10,
     fontWeight: "700",
+    fontFamily: "monospace",
+  },
+  displayTextContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+    paddingVertical: 8,
+    backgroundColor: "#1A1A1A",
+    borderRadius: 4,
+  },
+  displayText: {
+    color: "#FFF",
+    fontSize: 12,
+    marginHorizontal: 4,
+  },
+  displayTextMain: {
+    color: "#FFF",
+    fontSize: 12,
+    fontWeight: "700",
+    fontFamily: "monospace",
+    flex: 1,
+    textAlign: "center",
+  },
+  platekText: {
+    color: "#666",
+    fontSize: 18,
+    fontWeight: "900",
+    letterSpacing: 3,
+    textAlign: "center",
+    marginBottom: 16,
+    fontStyle: "italic",
+  },
+  playbackControls: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+  },
+  playButton: {
+    width: 70,
+    height: 70,
+    borderRadius: 8,
+    backgroundColor: "#1A1A1A",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#333",
+  },
+  secondaryControls: {
+    flexDirection: "column",
+    gap: 8,
+  },
+  secondaryButton: {
+    width: 50,
+    height: 30,
+    backgroundColor: "#1A1A1A",
+    borderRadius: 4,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#333",
+  },
+  stopButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 4,
+    backgroundColor: "#1A1A1A",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#333",
+  },
+  buttonDisabled: {
+    opacity: 0.4,
+  },
+  // Cassette Compartment
+  cassetteCompartment: {
+    width: "100%",
+    maxWidth: 400,
+    backgroundColor: "#2A2A2A",
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: "#333",
+    padding: 16,
+    overflow: "hidden",
+  },
+  cassetteWindow: {
+    width: "100%",
+    height: 140,
+    backgroundColor: "rgba(220, 220, 220, 0.3)",
+    borderRadius: 8,
+    borderWidth: 3,
+    borderColor: "#555",
+    padding: 14,
+    marginBottom: 12,
+    position: "relative",
+    // Glass effect
+    borderTopColor: "#777",
+    borderLeftColor: "#777",
+    borderRightColor: "#444",
+    borderBottomColor: "#444",
+  },
+  cassette: {
+    flex: 1,
+    position: "relative",
+    backgroundColor: "rgba(200, 200, 200, 0.4)",
+    borderRadius: 4,
+    padding: 8,
+  },
+  cassetteBrand: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  maxellText: {
+    color: "#FFF",
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 1.5,
+    textShadowColor: "#000",
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+  },
+  bLogo: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: "#FFF",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#000",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+  },
+  bLogoText: {
     color: "#000",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  cassetteLabel: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 6,
+    paddingHorizontal: 4,
+  },
+  labelText: {
+    color: "#DDD",
+    fontSize: 7,
+    flex: 1,
+    fontFamily: "monospace",
     letterSpacing: 0.5,
+  },
+  redLabel: {
+    backgroundColor: "#D62D2D",
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 3,
+    marginLeft: 8,
+    borderWidth: 1,
+    borderColor: "#A00",
+    shadowColor: "#D62D2D",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.5,
+    shadowRadius: 2,
+  },
+  redLabelText: {
+    color: "#FFF",
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 1,
+  },
+  cassetteReels: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "center",
+    marginTop: 8,
+  },
+  reel: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "#1A1A1A",
+    borderWidth: 2,
+    borderColor: "#333",
+    justifyContent: "center",
+    alignItems: "center",
+    position: "relative",
+  },
+  reelLeft: {},
+  reelRight: {},
+  reelHub: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "#333",
+    borderWidth: 1,
+    borderColor: "#555",
+    zIndex: 2,
+  },
+  reelTape: {
+    position: "absolute",
+    borderRadius: 25,
+    backgroundColor: "#1A1A1A",
+    borderWidth: 2,
+    borderColor: "#333",
+  },
+  tapeLoadingIndicator: {
+    position: "absolute",
+    bottom: 4,
+    left: 12,
+    right: 12,
+    height: 2,
+  },
+  tapeLoadingBarContainer: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    borderRadius: 1,
+    overflow: "hidden",
+  },
+  tapeLoadingBar: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#FFDD57",
+    borderRadius: 1,
+  },
+  noCassette: {
+    height: 120,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  noCassetteText: {
+    color: "#666",
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 2,
+  },
+  musicPanel: {
+    backgroundColor: "#8B4513",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 4,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#A0522D",
+  },
+  musicText: {
+    color: "#FFF",
+    fontSize: 16,
+    fontWeight: "700",
+    letterSpacing: 2,
   },
 });

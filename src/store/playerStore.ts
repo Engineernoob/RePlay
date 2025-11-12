@@ -292,22 +292,9 @@ export const usePlayerStore = create<PlayerState>()(
 
       playSfx: async (name) => {
         try {
-          // SFX playback using expo-audio
-          // Note: For better performance, consider preloading SFX
-          const sfxMap: Record<string, any> = {
-            insert: require("../../assets/sfx/tape-cassette-insert.mp3"),
-            eject: require("../../assets/sfx/cassette-eject.mp3"),
-            click: require("../../assets/sfx/button-click.mp3"),
-          };
-          
-          const sfxSource = sfxMap[name];
-          if (sfxSource) {
-            // Create a temporary player for SFX
-            // In production, you might want to preload these
-            const { useAudioPlayer } = await import("expo-audio");
-            // Note: This is a simplified implementation
-            // For production, consider using a dedicated SFX manager
-          }
+          // Use sound effects utility
+          const { playSoundEffect } = await import("@/src/utils/soundEffects");
+          await playSoundEffect(name);
         } catch (error) {
           // Silently fail for SFX - not critical
           console.warn(`SFX ${name} not available:`, error);
