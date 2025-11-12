@@ -82,6 +82,11 @@ interface PlayerState extends PlaylistState {
   loadSavedPlaylist: (name: string) => void;
   autoPlaylist: (mode: "retro" | "party" | "chill") => void;
   suggestNextTrack: () => Track | null;
+
+  // ───── Cassette Memory Sync ─────
+  syncMemory: () => void;
+  activeCassetteId: string | null;
+  setActiveCassetteId: (id: string | null) => void;
 }
 
 /* ────────────────────────────────
@@ -112,33 +117,55 @@ export const usePlayerStore = create<PlayerState>()(
       volume: 1.0,
       playbackRate: 1.0,
       reelRotation: 0,
+      activeCassetteId: null,
 
       /* ───── Core Player Controls ───── */
       loadTrack: (track) => {
         try {
+          // Clear any previous errors
           set({ 
             currentTrack: track, 
-            isInitialized: true,
+            isInitialized: !!track,
             error: null,
-            isLoading: true,
+            isLoading: !!track,
           });
-          get().playSfx("insert");
+          // Play SFX if track is loaded
+          if (track) {
+            get().playSfx("insert");
+          }
         } catch (error) {
           set({
             error: {
               type: PlayerErrorType.LOAD_ERROR,
               message: error instanceof Error ? error.message : "Failed to load track",
             },
+            isLoading: false,
           });
         }
       },
 
       play: () => {
         try {
-          const { player, powerOn } = get();
+          const { player, powerOn, currentTrack } = get();
+          if (!currentTrack) {
+            console.warn("No track loaded");
+            return;
+          }
           if (player && powerOn) {
-            player.play();
+            player.play().catch((error) => {
+              console.error("Play error:", error);
+              set({
+                error: {
+                  type: PlayerErrorType.PLAY_ERROR,
+                  message: error instanceof Error ? error.message : "Failed to play track",
+                },
+              });
+            });
             set({ error: null });
+          } else if (!powerOn) {
+            console.warn("Player is powered off");
+          } else if (!player) {
+            console.warn("Audio player not initialized");
           }
           get().playSfx("click");
         } catch (error) {
@@ -421,6 +448,27 @@ export const usePlayerStore = create<PlayerState>()(
         const randomIndex = Math.floor(Math.random() * otherTracks.length);
         return otherTracks[randomIndex];
       },
+
+      /* ───── Cassette Memory Sync ───── */
+      setActiveCassetteId: (id) => {
+        set({ activeCassetteId: id });
+      },
+
+      // Cassette Persistence: Sync playback state to library store
+      syncMemory: () => {
+        const { activeCassetteId, currentTrack, currentTime } = get();
+        
+        if (activeCassetteId && currentTrack) {
+          // Import library store dynamically to avoid circular dependency
+          import("@/src/store/libraryStore").then(({ useLibraryStore }) => {
+            useLibraryStore.getState().updatePlaybackMemory(
+              activeCassetteId,
+              currentTrack.id,
+              currentTime
+            );
+          });
+        }
+      },
     }),
     {
       name: "walkman-player-store",
@@ -444,6 +492,7 @@ export const usePlayerStore = create<PlayerState>()(
         powerOn: state.powerOn,
         volume: state.volume,
         playbackRate: state.playbackRate,
+        activeCassetteId: state.activeCassetteId,
         // Note: player, isPlaying, duration, currentTime are runtime state
         // and should not be persisted
       }),
@@ -455,35 +504,59 @@ export const usePlayerStore = create<PlayerState>()(
    HOOK: usePlayerController
 ──────────────────────────────── */
 export function usePlayerController(track?: Track) {
+  // Create audio player with track's audio source
+  // useAudioPlayer will automatically recreate when track?.audio changes
   const player = useAudioPlayer(track?.audio, { updateInterval: 200 });
   const status = useAudioPlayerStatus(player);
 
+  // Initialize audio mode once
   useEffect(() => {
     (async () => {
-      await setAudioModeAsync({
-        playsInSilentMode: true,
-        shouldPlayInBackground: true,
-      });
+      try {
+        await setAudioModeAsync({
+          playsInSilentMode: true,
+          shouldPlayInBackground: true,
+        });
+      } catch (error) {
+        console.warn("Failed to set audio mode:", error);
+      }
     })();
   }, []);
 
+  // Update store when player status or track changes
   useEffect(() => {
-    usePlayerStore.setState({
-      isInitialized: true,
-      isPlaying: status.playing,
+    const stateUpdate: Partial<PlayerState> = {
+      isInitialized: !!track,
+      isPlaying: status.playing || false,
       duration: status.duration || 0,
       currentTime: status.currentTime || 0,
       player,
-      isLoading: status.isLoaded === false,
+      isLoading: track ? status.isLoaded === false : false,
       error: status.error
         ? {
             type: PlayerErrorType.PLAY_ERROR,
             message: status.error.message || "Playback error occurred",
           }
         : null,
-    });
+    };
+
+    usePlayerStore.setState(stateUpdate);
 
     // Update reel rotation when time changes
-    usePlayerStore.getState().setReelRotation();
+    if (status.duration > 0) {
+      usePlayerStore.getState().setReelRotation();
+    }
+
+    // Cassette Persistence: Auto-sync memory every 5 seconds during playback
+    if (status.playing && track) {
+      const syncInterval = setInterval(() => {
+        usePlayerStore.getState().syncMemory();
+      }, 5000); // Sync every 5 seconds
+
+      return () => clearInterval(syncInterval);
+    } else if (track) {
+      // Sync once when paused
+      usePlayerStore.getState().syncMemory();
+    }
   }, [status, player, track]);
 }
