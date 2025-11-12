@@ -14,36 +14,11 @@ import Animated, {
   withSpring,
   withTiming,
 } from "react-native-reanimated";
-import { router } from "expo-router"; // ✅ correct navigation hook
+import { router } from "expo-router";
 import { useTheme } from "@react-navigation/native";
 import type { ReplayThemeType } from "@/constants/replay-theme";
-
-const songs = [
-  {
-    id: "1",
-    title: "On My Mama",
-    artist: "Victoria Monét",
-    audio: require("@/assets/mp3s/OnMyMama.mp3"),
-    album: require("@/assets/images/covers/VictoriaMonet.png"),
-    color: "#FF7E57",
-  },
-  {
-    id: "2",
-    title: "Timeless",
-    artist: "The Weeknd & Playboi Carti",
-    audio: require("@/assets/mp3s/Timeless.mp3"),
-    album: require("@/assets/images/covers/Timeless.png"),
-    color: "#7E57FF",
-  },
-  {
-    id: "3",
-    title: "Paint the Town Red",
-    artist: "Doja Cat",
-    audio: require("@/assets/mp3s/PaintTheTownRed.mp3"),
-    album: require("@/assets/images/covers/Paint-The-Town-Red.png"),
-    color: "#D62D2D",
-  },
-];
+import { AVAILABLE_TRACKS } from "@/src/data/tracks";
+import type { Track } from "@/src/types/audio";
 
 const { width } = Dimensions.get("window");
 
@@ -51,7 +26,7 @@ function CassetteCard({
   item,
   onPress,
 }: {
-  item: (typeof songs)[0];
+  item: Track;
   onPress: () => void;
 }) {
   const rotation = useSharedValue(0);
@@ -102,7 +77,7 @@ function CassetteCard({
 export default function LibraryScreen() {
   const theme = useTheme() as ReplayThemeType;
 
-  const openPlayer = (item: (typeof songs)[0]) => {
+  const openPlayer = (item: Track) => {
     router.push({
       pathname: "/player",
       params: {
@@ -123,13 +98,20 @@ export default function LibraryScreen() {
       </Text>
 
       <FlatList
-        data={songs}
+        data={AVAILABLE_TRACKS}
         keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 }}
         renderItem={({ item }) => (
           <CassetteCard item={item} onPress={() => openPlayer(item)} />
         )}
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <Text style={[styles.emptyText, { color: theme.colors.text }]}>
+              No tracks available
+            </Text>
+          </View>
+        }
       />
     </View>
   );
@@ -177,5 +159,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 4,
     color: "#DDD",
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 60,
+  },
+  emptyText: {
+    fontSize: 16,
+    opacity: 0.7,
   },
 });

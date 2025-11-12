@@ -10,10 +10,11 @@ import Animated, {
   interpolate,
 } from "react-native-reanimated";
 import { usePlayerStore } from "@/src/store/playerStore";
+import type { AlbumArtSource } from "@/src/types/audio";
 
 interface CassetteProps {
   color: string;
-  album: any;
+  album: AlbumArtSource;
   title?: string;
   artist?: string;
   sharedTransitionTag?: string;

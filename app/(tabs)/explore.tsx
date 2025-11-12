@@ -1,112 +1,247 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import React, { useState } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  TextInput,
+} from "react-native";
+import { router } from "expo-router";
+import { useTheme } from "@react-navigation/native";
+import type { ReplayThemeType } from "@/constants/replay-theme";
+import { AVAILABLE_TRACKS, searchTracks, getTracksByGenre } from "@/src/data/tracks";
+import { usePlayerStore } from "@/src/store/playerStore";
+import type { Track } from "@/src/types/audio";
 
-import { Collapsible } from '@/components/ui/collapsible';
-import { ExternalLink } from '@/components/external-link';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Fonts } from '@/constants/theme';
+const GENRES = ["All", "R&B", "Hip-Hop", "Pop"];
 
-export default function TabTwoScreen() {
+export default function ExploreScreen() {
+  const theme = useTheme() as ReplayThemeType;
+  const { addToPlaylist, loadTrack } = usePlayerStore();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedGenre, setSelectedGenre] = useState("All");
+
+  const filteredTracks =
+    selectedGenre === "All"
+      ? searchQuery
+        ? searchTracks(searchQuery)
+        : AVAILABLE_TRACKS
+      : getTracksByGenre(selectedGenre).filter((track) =>
+          searchQuery
+            ? track.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+              track.artist.toLowerCase().includes(searchQuery.toLowerCase())
+            : true
+        );
+
+  const handleTrackPress = (track: Track) => {
+    loadTrack(track);
+    router.push({
+      pathname: "/player",
+      params: { id: track.id },
+    });
+  };
+
+  const handleAddToPlaylist = (track: Track) => {
+    addToPlaylist(track);
+  };
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
-      headerImage={
-        <IconSymbol
-          size={310}
-          color="#808080"
-          name="chevron.left.forwardslash.chevron.right"
-          style={styles.headerImage}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText
-          type="title"
-          style={{
-            fontFamily: Fonts.rounded,
-          }}>
-          Explore
-        </ThemedText>
-      </ThemedView>
-      <ThemedText>This app includes example code to help you get started.</ThemedText>
-      <Collapsible title="File-based routing">
-        <ThemedText>
-          This app has two screens:{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/explore.tsx</ThemedText>
-        </ThemedText>
-        <ThemedText>
-          The layout file in <ThemedText type="defaultSemiBold">app/(tabs)/_layout.tsx</ThemedText>{' '}
-          sets up the tab navigator.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/router/introduction">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Android, iOS, and web support">
-        <ThemedText>
-          You can open this project on Android, iOS, and the web. To open the web version, press{' '}
-          <ThemedText type="defaultSemiBold">w</ThemedText> in the terminal running this project.
-        </ThemedText>
-      </Collapsible>
-      <Collapsible title="Images">
-        <ThemedText>
-          For static images, you can use the <ThemedText type="defaultSemiBold">@2x</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">@3x</ThemedText> suffixes to provide files for
-          different screen densities
-        </ThemedText>
-        <Image
-          source={require('@/assets/images/react-logo.png')}
-          style={{ width: 100, height: 100, alignSelf: 'center' }}
-        />
-        <ExternalLink href="https://reactnative.dev/docs/images">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Light and dark mode components">
-        <ThemedText>
-          This template has light and dark mode support. The{' '}
-          <ThemedText type="defaultSemiBold">useColorScheme()</ThemedText> hook lets you inspect
-          what the user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Animations">
-        <ThemedText>
-          This template includes an example of an animated component. The{' '}
-          <ThemedText type="defaultSemiBold">components/HelloWave.tsx</ThemedText> component uses
-          the powerful{' '}
-          <ThemedText type="defaultSemiBold" style={{ fontFamily: Fonts.mono }}>
-            react-native-reanimated
-          </ThemedText>{' '}
-          library to create a waving hand animation.
-        </ThemedText>
-        {Platform.select({
-          ios: (
-            <ThemedText>
-              The <ThemedText type="defaultSemiBold">components/ParallaxScrollView.tsx</ThemedText>{' '}
-              component provides a parallax effect for the header image.
-            </ThemedText>
-          ),
-        })}
-      </Collapsible>
-    </ParallaxScrollView>
+    <View
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
+    >
+      <Text style={[styles.header, { color: theme.colors.primary }]}>
+        🔍 Explore Music
+      </Text>
+
+      {/* Search Bar */}
+      <TextInput
+        style={[
+          styles.searchInput,
+          {
+            backgroundColor: theme.colors.card,
+            color: theme.colors.text,
+            borderColor: theme.colors.border,
+          },
+        ]}
+        placeholder="Search tracks or artists..."
+        placeholderTextColor={theme.colors.secondaryText}
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+      />
+
+      {/* Genre Filter */}
+      <View style={styles.genreContainer}>
+        {GENRES.map((genre) => (
+          <TouchableOpacity
+            key={genre}
+            style={[
+              styles.genreButton,
+              selectedGenre === genre && styles.genreButtonActive,
+              {
+                backgroundColor:
+                  selectedGenre === genre
+                    ? theme.colors.primary
+                    : theme.colors.card,
+                borderColor: theme.colors.border,
+              },
+            ]}
+            onPress={() => setSelectedGenre(genre)}
+          >
+            <Text
+              style={[
+                styles.genreText,
+                {
+                  color:
+                    selectedGenre === genre
+                      ? theme.colors.background
+                      : theme.colors.text,
+                },
+              ]}
+            >
+              {genre}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Track List */}
+      <FlatList
+        data={filteredTracks}
+        keyExtractor={(item) => item.id}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 100 }}
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            style={[
+              styles.trackCard,
+              { backgroundColor: theme.colors.card, borderColor: theme.colors.border },
+            ]}
+            onPress={() => handleTrackPress(item)}
+          >
+            <View style={styles.trackInfo}>
+              <Text style={[styles.trackTitle, { color: theme.colors.text }]}>
+                {item.title}
+              </Text>
+              <Text
+                style={[styles.trackArtist, { color: theme.colors.secondaryText }]}
+              >
+                {item.artist}
+              </Text>
+              {item.genre && (
+                <Text
+                  style={[styles.trackGenre, { color: theme.colors.secondaryText }]}
+                >
+                  {item.genre}
+                </Text>
+              )}
+            </View>
+            <TouchableOpacity
+              style={[styles.addButton, { backgroundColor: item.color }]}
+              onPress={() => handleAddToPlaylist(item)}
+            >
+              <Text style={styles.addButtonText}>+</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        )}
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <Text style={[styles.emptyText, { color: theme.colors.text }]}>
+              {searchQuery
+                ? "No tracks found matching your search"
+                : "No tracks available"}
+            </Text>
+          </View>
+        }
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  headerImage: {
-    color: '#808080',
-    bottom: -90,
-    left: -35,
-    position: 'absolute',
+  container: {
+    flex: 1,
+    paddingTop: 50,
+    paddingHorizontal: 20,
   },
-  titleContainer: {
-    flexDirection: 'row',
-    gap: 8,
+  header: {
+    fontSize: 24,
+    fontWeight: "700",
+    marginBottom: 20,
+  },
+  searchInput: {
+    height: 50,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    fontSize: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+  },
+  genreContainer: {
+    flexDirection: "row",
+    marginBottom: 20,
+    gap: 10,
+  },
+  genreButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  genreButtonActive: {
+    opacity: 1,
+  },
+  genreText: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  trackCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 16,
+    marginBottom: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  trackInfo: {
+    flex: 1,
+  },
+  trackTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  trackArtist: {
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  trackGenre: {
+    fontSize: 12,
+    opacity: 0.7,
+  },
+  addButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 12,
+  },
+  addButtonText: {
+    color: "#FFF",
+    fontSize: 24,
+    fontWeight: "700",
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 60,
+  },
+  emptyText: {
+    fontSize: 16,
+    opacity: 0.7,
+    textAlign: "center",
   },
 });

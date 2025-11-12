@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from "react";
 import { useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 import { usePlayerStore } from "@/src/store/playerStore";
+import type { AlbumArtSource } from "@/src/types/audio";
 
 /* ────────────────────────────────
    VISUAL SYNC HOOKS
@@ -55,7 +56,7 @@ export function useLEDStatus(): {
 export function useTrackMetadata(): {
   title: string;
   artist: string;
-  album: any;
+  album: AlbumArtSource | null;
   color: string;
   hasTrack: boolean;
 } {

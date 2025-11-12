@@ -11,6 +11,7 @@ import {
 import { useTheme } from "@react-navigation/native";
 import type { WalkmanThemeType } from "@/constants/walkman-theme";
 import { usePlayerStore } from "@/src/store/playerStore";
+import type { Track } from "@/src/types/audio";
 import Cassette from "@/components/Cassette";
 
 export default function PlaylistManager({
@@ -86,7 +87,7 @@ export default function PlaylistManager({
     }
   };
 
-  const renderPlaylistItem = ({ item, index }: { item: any; index: number }) => (
+  const renderPlaylistItem = ({ item, index }: { item: Track; index: number }) => (
     <View style={[
       styles.playlistItem,
       index === currentTrackIndex && styles.currentTrack,
